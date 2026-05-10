@@ -1,0 +1,176 @@
+{
+  "schema_version": "1.0",
+  "domain": "product_lab_learning_rpg",
+  "status": "prototype",
+  "purpose": "Learning RPG EngineのMVPデータ。学習ジャンルごとに世界観を差し替えながら、レベル、経験値、ステージ、アイテム、ボス、次クエストを表示する。",
+  "engine": {
+    "name": "Learning RPG Engine",
+    "summary": "学習を、進捗管理ではなく冒険・成長・攻略として表現する共通プロトタイプ。",
+    "shared_parts": ["level", "exp", "worlds", "stages", "items", "bosses", "next_quest"],
+    "mvp_note": "MVPではクイズ回答、EXP保存、ログイン連携、実画像生成は扱わない。"
+  },
+  "themes": [
+    {
+      "theme_id": "python_learning_rpg",
+      "name": "Python Learning RPG",
+      "short_name": "Python Quest",
+      "worldview": "western_fantasy",
+      "primary_device": "desktop_with_mobile_support",
+      "description": "Python / pandas / automation を、西洋ファンタジー風の冒険として学ぶ。",
+      "device_policy": {
+        "mobile": "概念理解、コード読解、処理順序、設計判断を進める。",
+        "desktop": "コード実装、デバッグ、ファイル操作、Git、小アプリ制作を進める。"
+      },
+      "player": {
+        "level": 12,
+        "exp": 1240,
+        "next_level_exp": 1500,
+        "title": "データ加工士"
+      },
+      "worlds": [
+        {
+          "world_id": "python_world_1_basics",
+          "title": "Python草原",
+          "summary": "list、dict、for、if、defの基礎を旅する。",
+          "stages": [
+            {"stage_id": "python_w1_s1_list", "title": "listの村", "summary": "順番のあるデータを扱う", "status": "cleared", "device_requirement": "mobile_ok", "stage_type": "concept_quiz", "exp_reward": 10, "linked_skill_ids": ["python_list"]},
+            {"stage_id": "python_w1_s2_dict", "title": "dictの塔", "summary": "keyとvalueの対応を学ぶ", "status": "cleared", "device_requirement": "mobile_ok", "stage_type": "reading_quiz", "exp_reward": 12, "linked_skill_ids": ["python_dict"]},
+            {"stage_id": "python_w1_boss", "title": "文法の番人", "summary": "基礎文法をまとめて確認する", "status": "cleared", "device_requirement": "both", "stage_type": "boss", "exp_reward": 40, "linked_skill_ids": ["python_basics"]}
+          ]
+        },
+        {
+          "world_id": "python_world_3_pandas",
+          "title": "pandas王国",
+          "summary": "表データの抽出、集計、結合、整形を学ぶ。",
+          "stages": [
+            {"stage_id": "python_w3_s1_filter", "title": "filterの関所", "summary": "条件で行を抽出する考え方を学ぶ", "status": "in_progress", "device_requirement": "mobile_ok", "stage_type": "concept_quiz", "exp_reward": 15, "linked_skill_ids": ["pandas_filter"]},
+            {"stage_id": "python_w3_s2_groupby", "title": "groupbyの山", "summary": "分類して集計する", "status": "locked", "device_requirement": "desktop_preferred", "stage_type": "implementation", "exp_reward": 35, "linked_skill_ids": ["pandas_groupby"]},
+            {"stage_id": "python_w3_boss", "title": "混沌の売上表", "summary": "乱れたCSVを整形して集計する", "status": "locked", "device_requirement": "desktop_required", "stage_type": "boss", "exp_reward": 80, "linked_skill_ids": ["pandas_project"]}
+          ]
+        },
+        {
+          "world_id": "python_world_5_apps",
+          "title": "アプリ創造大陸",
+          "summary": "Streamlit、API、FastAPI、GitHub Actionsへ進む。",
+          "stages": [
+            {"stage_id": "python_w5_s1_streamlit", "title": "Streamlitの広場", "summary": "小さなUIを作る", "status": "locked", "device_requirement": "desktop_required", "stage_type": "mini_project", "exp_reward": 70, "linked_skill_ids": ["streamlit"]},
+            {"stage_id": "python_w5_boss", "title": "動くアプリの竜", "summary": "学習内容を動くアプリにまとめる", "status": "locked", "device_requirement": "desktop_required", "stage_type": "boss", "exp_reward": 120, "linked_skill_ids": ["app_mvp"]}
+          ]
+        }
+      ],
+      "items": ["データの袋: list", "キーの辞典: dict", "関数の杖: def", "表計算の魔導書: pandas", "集計の斧: groupby", "俯瞰の鏡: pivot_table"],
+      "bosses": ["文法の番人", "参照の幻影", "混沌の売上表", "手作業の魔王", "動くアプリの竜"],
+      "next_quest": {
+        "title": "filterの関所を突破する",
+        "summary": "条件式でデータを絞る考え方を、スマホで読んでPCで実装する。",
+        "device_requirement": "both"
+      }
+    },
+    {
+      "theme_id": "english_learning_rpg",
+      "name": "English Learning RPG",
+      "short_name": "English Frontier",
+      "worldview": "american_frontier",
+      "primary_device": "mobile_first",
+      "description": "英語を、町・荒野・鉄道・会話の旅として進めるスマホ中心のRPG。",
+      "device_policy": {
+        "mobile": "語彙、文法、リスニング、会話選択を短時間で進める。",
+        "desktop": "長文ライティングや発音記録の整理に使う。"
+      },
+      "player": {
+        "level": 8,
+        "exp": 760,
+        "next_level_exp": 1000,
+        "title": "旅する会話者"
+      },
+      "worlds": [
+        {
+          "world_id": "english_world_1_words",
+          "title": "Word Desert",
+          "summary": "語彙を道具として集め、短い文で使えるようにする。",
+          "stages": [
+            {"stage_id": "english_w1_s1_daily_words", "title": "日常語の補給所", "summary": "よく使う単語をカードで確認する", "status": "cleared", "device_requirement": "mobile_preferred", "stage_type": "reading_quiz", "exp_reward": 10, "linked_skill_ids": ["english_vocab"]},
+            {"stage_id": "english_w1_s2_phrase_combo", "title": "熟語コンボの丘", "summary": "単語をつないで意味を作る", "status": "in_progress", "device_requirement": "mobile_preferred", "stage_type": "order_puzzle", "exp_reward": 15, "linked_skill_ids": ["english_phrase"]}
+          ]
+        },
+        {
+          "world_id": "english_world_3_grammar",
+          "title": "Grammar Canyon",
+          "summary": "文法をルールとして使い、会話の道を通す。",
+          "stages": [
+            {"stage_id": "english_w3_s1_tense", "title": "時制の吊り橋", "summary": "過去・現在・未来を選び分ける", "status": "locked", "device_requirement": "mobile_ok", "stage_type": "concept_quiz", "exp_reward": 18, "linked_skill_ids": ["english_tense"]},
+            {"stage_id": "english_w3_boss", "title": "文法の保安官", "summary": "会話文の違和感を直す", "status": "locked", "device_requirement": "mobile_preferred", "stage_type": "boss", "exp_reward": 50, "linked_skill_ids": ["english_grammar"]}
+          ]
+        },
+        {
+          "world_id": "english_world_5_conversation",
+          "title": "Conversation Saloon",
+          "summary": "短い会話イベントで応答を選ぶ。",
+          "stages": [
+            {"stage_id": "english_w5_s1_first_reply", "title": "最初の返答", "summary": "場面に合う返しを選ぶ", "status": "locked", "device_requirement": "mobile_preferred", "stage_type": "design_decision", "exp_reward": 20, "linked_skill_ids": ["english_conversation"]}
+          ]
+        }
+      ],
+      "items": ["単語カード", "文法バッジ", "口笛のお守り", "応答のリボルバー", "電報ペン", "商談帽"],
+      "bosses": ["はじめての会話番人", "語彙の荒くれ者", "文法の保安官", "早口の車掌", "沈黙のガンマン", "グローバル商談ボス"],
+      "next_quest": {
+        "title": "熟語コンボの丘",
+        "summary": "短いフレーズを並べ替え、自然な会話の流れを作る。",
+        "device_requirement": "mobile_preferred"
+      }
+    },
+    {
+      "theme_id": "japanese_history_rpg",
+      "name": "Japanese History RPG",
+      "short_name": "時代街道",
+      "worldview": "japanese_history_emaki",
+      "primary_device": "mobile_first",
+      "description": "日本史を、絵巻・街道・時代旅として学ぶストーリー型RPG。",
+      "device_policy": {
+        "mobile": "年表カード、人物カード、因果関係クイズ、時代マップを進める。",
+        "desktop": "調べた内容の整理や長めの歴史メモに使う。"
+      },
+      "player": {
+        "level": 6,
+        "exp": 540,
+        "next_level_exp": 900,
+        "title": "時代を旅する者"
+      },
+      "worlds": [
+        {
+          "world_id": "history_world_1_ancient",
+          "title": "縄文・弥生の村",
+          "summary": "暮らし、稲作、社会の変化をつかむ。",
+          "stages": [
+            {"stage_id": "history_w1_s1_jomon", "title": "土器と暮らし", "summary": "暮らしの変化をカードで見る", "status": "cleared", "device_requirement": "mobile_ok", "stage_type": "reading_quiz", "exp_reward": 10, "linked_skill_ids": ["history_jomon"]},
+            {"stage_id": "history_w1_s2_yayoi", "title": "稲作の広がり", "summary": "生活と社会の変化を選ぶ", "status": "in_progress", "device_requirement": "mobile_ok", "stage_type": "concept_quiz", "exp_reward": 15, "linked_skill_ids": ["history_yayoi"]}
+          ]
+        },
+        {
+          "world_id": "history_world_4_samurai",
+          "title": "鎌倉・室町の武士道",
+          "summary": "武士の台頭と政治の変化を追う。",
+          "stages": [
+            {"stage_id": "history_w4_s1_kamakura", "title": "御恩と奉公", "summary": "武士社会の仕組みを読む", "status": "locked", "device_requirement": "mobile_ok", "stage_type": "concept_quiz", "exp_reward": 18, "linked_skill_ids": ["history_kamakura"]},
+            {"stage_id": "history_w4_boss", "title": "武士の時代の番人", "summary": "政治と土地の因果を整理する", "status": "locked", "device_requirement": "both", "stage_type": "boss", "exp_reward": 55, "linked_skill_ids": ["history_samurai"]}
+          ]
+        },
+        {
+          "world_id": "history_world_7_modern",
+          "title": "明治維新と近代国家",
+          "summary": "黒船から近代化までの流れをつかむ。",
+          "stages": [
+            {"stage_id": "history_w7_s1_black_ship", "title": "黒船の衝撃", "summary": "外圧が政治を動かす流れを学ぶ", "status": "locked", "device_requirement": "mobile_preferred", "stage_type": "order_puzzle", "exp_reward": 22, "linked_skill_ids": ["history_meiji"]}
+          ]
+        }
+      ],
+      "items": ["時の巻物", "人物札", "法の札", "国土地図", "文化の宝箱", "合戦絵巻", "歴史の羅針盤", "時代の鏡"],
+      "bosses": ["古代集落の謎", "都づくりの試練", "武士の時代の番人", "天下分け目の決戦", "黒船の衝撃", "近代化の試練", "現代日本の問い"],
+      "next_quest": {
+        "title": "稲作の広がり",
+        "summary": "食料生産の変化が、集落・争い・身分へどうつながるかを見る。",
+        "device_requirement": "mobile_ok"
+      }
+    }
+  ]
+}
