@@ -68,6 +68,17 @@ type LearningRpgClientProps = {
   initialThemeId?: string;
 };
 
+const historyFieldTiles: Array<Array<"water" | "grass" | "road" | "hill" | "mountain" | "shore">> = [
+  ["water", "water", "water", "water", "water", "water", "water", "water", "water", "water", "water", "water"],
+  ["water", "water", "water", "water", "shore", "shore", "shore", "grass", "grass", "grass", "grass", "water"],
+  ["water", "water", "water", "shore", "grass", "grass", "road", "road", "road", "grass", "grass", "water"],
+  ["water", "water", "shore", "grass", "grass", "road", "grass", "hill", "road", "road", "grass", "water"],
+  ["water", "shore", "grass", "grass", "road", "road", "grass", "hill", "hill", "road", "grass", "water"],
+  ["water", "grass", "grass", "road", "road", "grass", "grass", "grass", "hill", "road", "road", "water"],
+  ["water", "grass", "road", "road", "grass", "grass", "mountain", "grass", "grass", "grass", "grass", "water"],
+  ["water", "water", "water", "water", "water", "grass", "grass", "grass", "grass", "water", "water", "water"]
+];
+
 export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClientProps) {
   const defaultThemeId = getDefaultThemeId(dashboard, initialThemeId);
   const [activeThemeId, setActiveThemeId] = useState(getDefaultThemeId(dashboard, PLAYABLE_THEME_ID) || defaultThemeId);
@@ -115,14 +126,13 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
   const activeTheme = dashboard.themes.find((theme) => theme.theme_id === PLAYABLE_THEME_ID) ?? dashboard.themes[0];
   const firstWorld = activeTheme.worlds[0];
   const firstStage = firstWorld?.stages[0];
+  const chapterStages = firstWorld?.stages.slice(0, 1) ?? [];
   const progress = themeProgress[activeTheme.theme_id] ?? buildDefaultThemeProgress(activeTheme);
   const battle = battleStates[activeTheme.theme_id] ?? buildBattleStateFromStage(activeTheme, firstStage?.stage_id || "");
   const hero = heroStates[activeTheme.theme_id] ?? buildDefaultHeroState(activeTheme);
   const selectedStage = firstStage ?? findStage(activeTheme, progress.selectedStageId) ?? findFirstStage(activeTheme);
-  const totalStages = countStages(activeTheme);
-  const clearedStages = countStages(activeTheme, progress.stageStatuses, "cleared");
-  const inProgressStages = countStages(activeTheme, progress.stageStatuses, "in_progress");
-  const lockedStages = countStages(activeTheme, progress.stageStatuses, "locked");
+  const totalStages = chapterStages.length;
+  const clearedStages = chapterStages.filter((stage) => (progress.stageStatuses[stage.stage_id] ?? stage.status) === "cleared").length;
   const expRate = Math.min(100, Math.round((hero.exp / hero.nextLevelExp) * 100));
 
   if (!gameStarted) {
@@ -311,24 +321,24 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
         </div>
       </section>
 
-      <DashboardCard title="プレイ中のテーマ" subtitle="ボタンで切り替え、進行はこのブラウザに保存される。">
+      <DashboardCard title="第1章の進行" subtitle="まずは土器と暮らしだけを、1プレイぶん遊ぶ。">
         <div className="grid gap-2 md:grid-cols-[1.35fr_0.65fr]">
           <div className="rounded-sm border border-[#2f7f8f] bg-[#eef7fb] px-4 py-4 text-left shadow-sm">
             <p className="text-[11px] font-semibold tracking-[0.16em] text-[#4f7a8d] uppercase">CURRENT QUEST</p>
-            <p className="mt-2 text-base font-bold text-slate-900">{activeTheme.name}</p>
-            <p className="mt-1 text-sm text-slate-600">まずは日本史の第1章だけ遊べる。ほかのテーマは準備中。</p>
+            <p className="mt-2 text-base font-bold text-slate-900">{selectedStage?.title}</p>
+            <p className="mt-1 text-sm text-slate-600">{selectedStage?.summary}</p>
           </div>
           <div className="rounded-sm border border-line bg-white px-4 py-4 shadow-sm">
             <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">STATUS</p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">Lv.{hero.level} / EXP {hero.exp.toLocaleString()}</p>
-            <p className="mt-1 text-xs text-slate-500">第1章のクリアで少しずつ伸びる。</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">章クリア {clearedStages}/{totalStages}</p>
+            <p className="mt-1 text-xs text-slate-500">まず1章をクリアして、ゲームの手触りを確認する。</p>
           </div>
         </div>
       </DashboardCard>
 
-      <DashboardCard title="RPGフィールド" subtitle="地図から敵に触れて、戦闘画面へ入る。ドラクエ3っぽい見た目を優先した画面。">
+      <DashboardCard title="WORLD MAP" subtitle="地図を歩き、村や道から1ステージに入る。">
         <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-          <div className="rounded-[28px] border border-[#9fc1ae] bg-[linear-gradient(180deg,#243a2a_0%,#17251c_45%,#0f1511_100%)] p-4 text-[#f2f0e7] shadow-[0_18px_50px_rgba(17,24,39,0.22)]">
+          <div className="rounded-[28px] border border-[#9fc1ae] bg-[linear-gradient(180deg,#23372a_0%,#17251c_45%,#0f1511_100%)] p-4 text-[#f2f0e7] shadow-[0_18px_50px_rgba(17,24,39,0.22)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-[11px] font-semibold tracking-[0.22em] text-[#c9d6c6] uppercase">FIELD MAP</p>
@@ -336,10 +346,8 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
                 <p className="mt-2 max-w-2xl text-sm leading-6 text-[#d8e2d8]">{activeTheme.description}</p>
               </div>
               <div className="rounded-2xl border border-[#5f7c67] bg-[#101913] px-4 py-3 text-center">
-                <p className="text-[10px] font-semibold tracking-[0.18em] text-[#b7c5b4] uppercase">PROGRESS</p>
-                <p className="mt-1 text-lg font-black text-[#f3c57a]">
-                  {clearedStages}/{totalStages}
-                </p>
+                <p className="text-[10px] font-semibold tracking-[0.18em] text-[#b7c5b4] uppercase">CHAPTER</p>
+                <p className="mt-1 text-lg font-black text-[#f3c57a]">{clearedStages}/{totalStages}</p>
               </div>
             </div>
 
@@ -358,33 +366,85 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
               </div>
             </div>
 
-            <div className="mt-4 rounded-[24px] border border-[#4d674f] bg-[linear-gradient(180deg,#2b4230_0%,#22362a_100%)] p-3">
-              {firstWorld ? (
-                <section>
-                  <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-[10px] font-semibold tracking-[0.22em] text-[#b7c5b4] uppercase">WORLD 1</p>
-                      <h4 className="mt-1 text-base font-black text-white">{firstWorld.title}</h4>
-                    </div>
-                    <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1 text-[11px] font-semibold text-[#c9d6c6]">
-                      1 node
-                    </span>
-                  </div>
-                  <div className="grid gap-2">
-                    {firstWorld.stages.slice(0, 1).map((stage, stageIndex) => (
-                      <StageRow
-                        key={stage.stage_id}
-                        stage={stage}
-                        index={stageIndex}
-                        status={progress.stageStatuses[stage.stage_id] ?? stage.status}
-                        selected={selectedStage?.stage_id === stage.stage_id}
-                        onSelect={selectStage}
-                        onAdvance={(stageId) => enterBattle(stageId)}
+            <div className="mt-4 rounded-[28px] border border-[#4d674f] bg-[#132016] p-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 px-1 pb-3">
+                <div>
+                  <p className="text-[10px] font-semibold tracking-[0.22em] text-[#b7c5b4] uppercase">OVERWORLD</p>
+                  <h4 className="mt-1 text-base font-black text-white">{firstWorld?.title ?? "第1章の地図"}</h4>
+                </div>
+                <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-[#d7e4d7]">
+                  <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">村</span>
+                  <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">道</span>
+                  <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">丘</span>
+                  <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">目的地</span>
+                </div>
+              </div>
+
+              <div className="relative overflow-hidden rounded-[28px] border border-[#5f7c67] bg-[#80b4dd] shadow-inner shadow-black/20">
+                <div className="grid aspect-[12/8] grid-cols-12 grid-rows-8">
+                  {historyFieldTiles.flatMap((row, rowIndex) =>
+                    row.map((tile, colIndex) => (
+                      <div
+                        key={`${rowIndex}-${colIndex}`}
+                        className={`border border-black/10 ${
+                          tile === "water"
+                            ? "bg-[#7eb1dc]"
+                            : tile === "shore"
+                              ? "bg-[#b7d3c5]"
+                              : tile === "road"
+                                ? "bg-[#d8c48d]"
+                                : tile === "hill"
+                                  ? "bg-[#88aa63]"
+                                  : tile === "mountain"
+                                    ? "bg-[#6f8671]"
+                                    : "bg-[#91bd74]"
+                        }`}
                       />
-                    ))}
-                  </div>
-                </section>
-              ) : null}
+                    ))
+                  )}
+                </div>
+
+                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(255,255,255,0.08),transparent_35%)]" />
+
+                <div className="absolute left-[12%] top-[56%]">
+                  <MapMarker
+                    label="縄文の村"
+                    sublabel="土器と暮らし"
+                    active={selectedStage?.stage_id === "history_w1_s1_jomon"}
+                    onClick={() => selectStage("history_w1_s1_jomon")}
+                  />
+                </div>
+                <div className="absolute left-[45%] top-[40%]">
+                  <MapMarker
+                    label="稲作の道"
+                    sublabel="次の章"
+                    locked
+                    active={false}
+                    onClick={() => selectStage("history_w1_s2_yayoi")}
+                  />
+                </div>
+                <div className="absolute left-[72%] top-[27%]">
+                  <MapMarker label="弥生の丘" sublabel="準備中" locked active={false} />
+                </div>
+
+                <div className="absolute left-[26%] top-[68%] h-1 w-[32%] rounded-full bg-[#f3c57a]/50" />
+                <div className="absolute left-[50%] top-[47%] h-1 w-[22%] rotate-[-14deg] rounded-full bg-[#f3c57a]/35" />
+              </div>
+
+              <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-[18px] border border-[#40505c] bg-[#101913] px-3 py-3 text-[#e7f0e4]">
+                  <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">START</p>
+                  <p className="mt-1 text-sm font-bold text-white">縄文の村</p>
+                </div>
+                <div className="rounded-[18px] border border-[#40505c] bg-[#101913] px-3 py-3 text-[#e7f0e4]">
+                  <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">ROUTE</p>
+                  <p className="mt-1 text-sm font-bold text-white">土器と暮らし → 稲作の広がり</p>
+                </div>
+                <div className="rounded-[18px] border border-[#40505c] bg-[#101913] px-3 py-3 text-[#e7f0e4]">
+                  <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">EXIT</p>
+                  <p className="mt-1 text-sm font-bold text-white">まずは1章クリア</p>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -699,6 +759,38 @@ function BattleCommandButton({
       className="rounded-sm border border-[#5f7584] bg-[#0f1720] px-3 py-3 text-left text-sm font-semibold text-[#f4eddc] transition hover:border-[#f3c57a] hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
     >
       {label}
+    </button>
+  );
+}
+
+function MapMarker({
+  label,
+  sublabel,
+  active,
+  locked,
+  onClick
+}: {
+  label: string;
+  sublabel: string;
+  active?: boolean;
+  locked?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`pointer-events-auto min-w-[92px] rounded-2xl border px-3 py-2 text-left shadow-[0_10px_25px_rgba(0,0,0,0.22)] transition ${
+        active
+          ? "border-[#f3c57a] bg-[#101913] text-white"
+          : locked
+            ? "border-[#5f7584] bg-[#0f1720] text-[#d7e2e8]"
+            : "border-[#9cb6a2] bg-[#112015] text-[#f4eddc] hover:border-[#f3c57a]"
+      }`}
+    >
+      <p className="text-[10px] font-semibold tracking-[0.18em] uppercase">{locked ? "LOCKED" : active ? "ACTIVE" : "MAP"}</p>
+      <p className="mt-1 text-sm font-black leading-5">{label}</p>
+      <p className="mt-1 text-[11px] leading-4 opacity-85">{sublabel}</p>
     </button>
   );
 }
