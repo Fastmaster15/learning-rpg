@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import type { LearningRpgDashboard } from "@/lib/learning-rpg";
 
 const STORAGE_KEY = "learning-rpg.classic-loop.v1";
+const TREASURE_CHEST_ID = "forest_chest_001";
 
 type Screen = "title" | "town" | "field" | "battle" | "status";
 type InventoryItem = { itemId: string; count: number };
@@ -17,7 +18,8 @@ type Enemy = {
   defense: number;
   expReward: number;
   goldReward: number;
-  area: "grassland" | "forest";
+  area: "grassland" | "forest" | "forest_depth";
+  role: "weak" | "normal" | "strong" | "mini_boss";
 };
 
 type Player = {
@@ -47,6 +49,8 @@ type GameState = {
   dialogue: string;
   steps: number;
   objectiveCleared: boolean;
+  openedChestIds: string[];
+  miniBossDefeated: boolean;
 };
 
 type Equipment = {
@@ -88,7 +92,8 @@ const enemies: Enemy[] = [
     defense: 1,
     expReward: 4,
     goldReward: 6,
-    area: "grassland"
+    area: "grassland",
+    role: "weak"
   },
   {
     id: "night_bat",
@@ -99,7 +104,8 @@ const enemies: Enemy[] = [
     defense: 2,
     expReward: 7,
     goldReward: 10,
-    area: "grassland"
+    area: "grassland",
+    role: "normal"
   },
   {
     id: "wild_boar",
@@ -110,17 +116,30 @@ const enemies: Enemy[] = [
     defense: 3,
     expReward: 12,
     goldReward: 18,
-    area: "forest"
+    area: "forest",
+    role: "strong"
+  },
+  {
+    id: "forest_guardian",
+    name: "森のぬし",
+    hp: 45,
+    maxHp: 45,
+    attack: 10,
+    defense: 4,
+    expReward: 25,
+    goldReward: 40,
+    area: "forest_depth",
+    role: "mini_boss"
   }
 ];
 
-const fieldMap = [
-  ["water", "grass", "grass", "forest", "goal"],
+const fieldMap: string[][] = [
+  ["water", "grass", "grass", "forest", "boss"],
   ["town", "road", "grass", "forest", "forest"],
-  ["water", "road", "grass", "grass", "hill"],
+  ["water", "road", "chest", "grass", "hill"],
   ["water", "grass", "forest", "road", "hill"],
   ["shore", "grass", "grass", "road", "water"]
-] as const;
+];
 
 const initialPlayer: Player = {
   name: "Hero",
@@ -147,7 +166,9 @@ const initialGameState: GameState = {
   log: ["旅の準備ができた。"],
   dialogue: "町の人に話しかけて、北の森へ向かう目的を聞こう。",
   steps: 0,
-  objectiveCleared: false
+  objectiveCleared: false,
+  openedChestIds: [],
+  miniBossDefeated: false
 };
 
 export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
@@ -192,11 +213,12 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
     setGame((current) => ({ ...current, screen }));
   }
 
-  function talkToNpc(kind: "goal" | "heal" | "shop" | "world") {
+  function talkToNpc(kind: "goal" | "heal" | "shop" | "boss" | "world") {
     const lines = {
       goal: "北の森で、あやしい光を見た人がいるらしい。道を外れすぎる前に戻れる場所を覚えておけ。",
       heal: "傷ついたら無理をするな。町に戻って休めば、また遠くまで歩ける。",
       shop: "森に行くなら、少し良い武器を持つと安心だよ。ゴールドは使ってこそ力になる。",
+      boss: "森の奥には、普通の魔物とは違う気配がある。薬草と装備を整えてから行くんだ。",
       world: "この町は旅人たちの休み場さ。外は静かだけど、森の奥は少しだけ空気が違う。"
     };
     setGame((current) => ({ ...current, dialogue: lines[kind], log: [lines[kind], ...current.log].slice(0, 8) }));
@@ -264,12 +286,62 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       }
 
       if (tile === "goal") {
+        if (!current.miniBossDefeated) {
+          return {
+            ...current,
+            position: nextPosition,
+            dialogue: "森の奥の光は、まだ近づくには危うい。先に森のぬしに挑む準備をしよう。",
+            log: ["森の奥に強い気配がある。", ...current.log].slice(0, 8)
+          };
+        }
         return {
           ...current,
           position: nextPosition,
           objectiveCleared: true,
           log: ["北の森の光を見つけた。最初の小目標を達成した！", ...current.log].slice(0, 8),
           dialogue: "森の奥に小さな光が残っている。次の章へ進めそうだ。"
+        };
+      }
+
+      if (tile === "chest") {
+        if (current.openedChestIds.includes(TREASURE_CHEST_ID)) {
+          return {
+            ...current,
+            position: nextPosition,
+            log: ["空の宝箱がある。", ...current.log].slice(0, 8)
+          };
+        }
+
+        playTone("treasure");
+        return {
+          ...current,
+          position: nextPosition,
+          player: addItem(current.player, "herb", 2),
+          openedChestIds: [...current.openedChestIds, TREASURE_CHEST_ID],
+          dialogue: "宝箱を開けた。薬草を2つ手に入れた！",
+          log: ["宝箱を見つけた！", "薬草を2つ手に入れた！", ...current.log].slice(0, 8)
+        };
+      }
+
+      if (tile === "boss") {
+        if (current.miniBossDefeated) {
+          return {
+            ...current,
+            position: nextPosition,
+            objectiveCleared: true,
+            dialogue: "森の奥の光は静かに消えている。小さな冒険は一区切りついた。",
+            log: ["北の森の光は、静かに消えていった。", ...current.log].slice(0, 8)
+          };
+        }
+
+        const enemy = spawnMiniBoss();
+        return {
+          ...current,
+          screen: "battle",
+          position: nextPosition,
+          currentEnemy: enemy,
+          log: ["森の奥に重い気配が満ちた。", `${enemy.name} が立ちはだかった！`, ...current.log].slice(0, 8),
+          dialogue: "小ボス戦だ。勝てなければ町へ戻り、装備と回復を整えよう。"
         };
       }
 
@@ -298,7 +370,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
   function seekBattle() {
     setGame((current) => {
       const tile = getTile(current.position);
-      const enemy = spawnEnemy(tile === "forest" ? "forest" : "grass");
+      const enemy = tile === "boss" ? spawnMiniBoss() : spawnEnemy(tile === "forest" ? "forest" : "grass");
       return {
         ...current,
         screen: "battle",
@@ -368,6 +440,9 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
   function fleeBattle() {
     setGame((current) => {
       if (!current.currentEnemy) return { ...current, screen: "field" };
+      if (current.currentEnemy.role === "mini_boss") {
+        return enemyTurn(current, ["森の奥では逃げられない！"]);
+      }
       if (Math.random() < 0.7) {
         return {
           ...current,
@@ -449,7 +524,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
             </div>
           </MessageWindow>
           <MessageWindow title="GOAL">
-            <p>{game.objectiveCleared ? "北の森の光を見つけた。町に戻って次の旅へ。" : "町で話を聞き、北東の森の奥にある光を探す。"}</p>
+            <p>{game.objectiveCleared ? "森のぬしを倒した。プロトタイプはここまで。" : "町で準備し、宝箱を探し、北東の森の奥にいる森のぬしへ挑む。"}</p>
           </MessageWindow>
         </aside>
       </div>
@@ -466,7 +541,7 @@ function TownScreen({
   onStatus
 }: {
   game: GameState;
-  onNpc: (kind: "goal" | "heal" | "shop" | "world") => void;
+  onNpc: (kind: "goal" | "heal" | "shop" | "boss" | "world") => void;
   onRest: () => void;
   onBuy: (itemId: "bronze_sword" | "leather_armor") => void;
   onField: () => void;
@@ -477,7 +552,7 @@ function TownScreen({
       <div className="grid gap-4">
         <div className="grid min-h-[260px] grid-cols-5 grid-rows-4 overflow-hidden rounded-[6px] border border-[#394b39]">
           {Array.from({ length: 20 }).map((_, index) => {
-            const labels: Record<number, string> = { 2: "宿", 6: "店", 9: "人", 12: "人", 16: "出口", 18: "人" };
+            const labels: Record<number, string> = { 2: "宿", 6: "店", 9: "人", 12: "人", 14: "人", 16: "出口", 18: "人" };
             return (
               <button key={index} type="button" onClick={() => handleTownTile(index, onNpc, onRest, onField)} className={`border border-black/20 text-sm font-black ${index === 2 || index === 6 ? "bg-[#7c5f3e]" : index === 16 ? "bg-[#d8c48d] text-[#16222d]" : labels[index] ? "bg-[#617c67]" : "bg-[#91bd74]"}`}>
                 {labels[index] ?? ""}
@@ -490,6 +565,7 @@ function TownScreen({
           <CommandButton label="町長と話す" detail="目的地を聞く" onClick={() => onNpc("goal")} />
           <CommandButton label="旅人と話す" detail="回復のヒント" onClick={() => onNpc("heal")} />
           <CommandButton label="店主と話す" detail="装備のヒント" onClick={() => onNpc("shop")} />
+          <CommandButton label="見張りと話す" detail="森の奥の警告" onClick={() => onNpc("boss")} />
           <CommandButton label="町人と話す" detail="世界観を聞く" onClick={() => onNpc("world")} />
           <CommandButton label="宿屋" detail="HP/MP全回復" onClick={onRest} />
           <CommandButton label="ステータス" detail="強さを見る" onClick={onStatus} />
@@ -532,6 +608,8 @@ function FieldScreen({
                 <div key={`${x}-${y}`} className={`relative border border-black/20 ${tileClass(tile)}`}>
                   {playerHere ? <div className="absolute inset-2 grid place-items-center rounded-[4px] border border-[#f3c57a] bg-[#101820] text-sm font-black text-[#f3c57a]">勇</div> : null}
                   {!playerHere && tile === "town" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-[#16222d]">町</span> : null}
+                  {!playerHere && tile === "chest" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-[#16222d]">{game.openedChestIds.includes(TREASURE_CHEST_ID) ? "空" : "宝"}</span> : null}
+                  {!playerHere && tile === "boss" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-white">{game.miniBossDefeated ? "光" : "主"}</span> : null}
                   {!playerHere && tile === "goal" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-white">光</span> : null}
                 </div>
               );
@@ -594,7 +672,7 @@ function BattleScreen({
           <CommandButton label="火の玉" detail="MP 3 / 強攻撃" onClick={onFire} disabled={player.mp < 3} />
           <CommandButton label="小回復" detail="MP 3 / HP回復" onClick={onHeal} disabled={player.mp < 3} />
           <CommandButton label={`薬草 ${herbCount}`} detail="HP回復" onClick={onHerb} disabled={herbCount <= 0} />
-          <CommandButton label="にげる" detail="成功率70%" onClick={onFlee} />
+          <CommandButton label="にげる" detail={enemy.role === "mini_boss" ? "小ボス戦は不可" : "成功率70%"} onClick={onFlee} />
         </div>
       </div>
     </GamePanel>
@@ -709,23 +787,43 @@ function loadGame() {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as GameState;
     if (!parsed?.player) return null;
-    return parsed;
+    return {
+      ...initialGameState,
+      ...parsed,
+      player: {
+        ...initialPlayer,
+        ...parsed.player,
+        items: parsed.player.items ?? initialPlayer.items
+      },
+      openedChestIds: parsed.openedChestIds ?? [],
+      miniBossDefeated: Boolean(parsed.miniBossDefeated),
+      objectiveCleared: Boolean(parsed.miniBossDefeated)
+    };
   } catch {
     return null;
   }
 }
 
-function handleTownTile(index: number, onNpc: (kind: "goal" | "heal" | "shop" | "world") => void, onRest: () => void, onField: () => void) {
+function handleTownTile(index: number, onNpc: (kind: "goal" | "heal" | "shop" | "boss" | "world") => void, onRest: () => void, onField: () => void) {
   if (index === 2) onRest();
   if (index === 6) onNpc("shop");
   if (index === 9) onNpc("goal");
   if (index === 12) onNpc("heal");
+  if (index === 14) onNpc("boss");
   if (index === 16) onField();
   if (index === 18) onNpc("world");
 }
 
 function getItemCount(player: Player, itemId: string) {
   return player.items.find((item) => item.itemId === itemId)?.count ?? 0;
+}
+
+function addItem(player: Player, itemId: string, count: number): Player {
+  const exists = player.items.some((item) => item.itemId === itemId);
+  return {
+    ...player,
+    items: exists ? player.items.map((item) => (item.itemId === itemId ? { ...item, count: item.count + count } : item)) : [...player.items, { itemId, count }]
+  };
 }
 
 function getAttack(player: Player) {
@@ -769,14 +867,26 @@ function winBattle(game: GameState, logs: string[]) {
   const beforeLevel = game.player.level;
   const leveledPlayer = applyLevelUps({ ...game.player, exp: gainedExp, gold: game.player.gold + enemy.goldReward });
   const levelLog = leveledPlayer.level > beforeLevel ? [`レベルが${leveledPlayer.level}に上がった！`] : [];
+  const miniBossWon = enemy.role === "mini_boss";
+  playTone(miniBossWon ? "boss" : levelLog.length ? "level" : "victory");
 
   return {
     ...game,
     screen: "field" as Screen,
     currentEnemy: null,
     player: leveledPlayer,
-    dialogue: "戦いに勝った。町に戻るか、もう少し先へ進むか選べる。",
-    log: [...logs, `${enemy.name}をたおした！`, `経験値${enemy.expReward}を手に入れた！`, `${enemy.goldReward}ゴールドを手に入れた！`, ...levelLog, ...game.log].slice(0, 8)
+    objectiveCleared: miniBossWon ? true : game.objectiveCleared,
+    miniBossDefeated: miniBossWon ? true : game.miniBossDefeated,
+    dialogue: miniBossWon ? "森のぬしをたおした。北の森の光は、静かに消えていった。" : "戦いに勝った。町に戻るか、もう少し先へ進むか選べる。",
+    log: [
+      ...logs,
+      `${enemy.name}をたおした！`,
+      `経験値${enemy.expReward}を手に入れた！`,
+      `${enemy.goldReward}ゴールドを手に入れた！`,
+      ...levelLog,
+      ...(miniBossWon ? ["北の森の光は、静かに消えていった。", "小さな冒険者として、一歩を踏み出した。"] : []),
+      ...game.log
+    ].slice(0, 8)
   };
 }
 
@@ -823,10 +933,17 @@ function spawnEnemy(tile: string): Enemy {
   return { ...base, hp: base.maxHp };
 }
 
+function spawnMiniBoss(): Enemy {
+  const base = enemies.find((enemy) => enemy.role === "mini_boss") ?? enemies[0];
+  return { ...base, hp: base.maxHp };
+}
+
 function tileLabel(tile: string) {
   const labels: Record<string, string> = {
     grass: "草原",
     forest: "森",
+    chest: "宝箱",
+    boss: "森の奥",
     hill: "丘",
     road: "街道",
     shore: "水辺"
@@ -841,9 +958,43 @@ function tileClass(tile: string) {
     grass: "bg-[#91bd74]",
     road: "bg-[#d8c48d]",
     forest: "bg-[#3f6f4f]",
+    chest: "bg-[#d8c48d]",
+    boss: "bg-[#7c5f8f]",
     hill: "bg-[#88aa63]",
     goal: "bg-[#7c5f8f]",
     town: "bg-[#d8c48d]"
   };
   return classes[tile] ?? "bg-[#91bd74]";
+}
+
+function playTone(kind: "victory" | "level" | "treasure" | "boss") {
+  if (typeof window === "undefined") return;
+  const AudioContextClass = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioContextClass) return;
+
+  try {
+    const audio = new AudioContextClass();
+    const now = audio.currentTime;
+    const sequence = {
+      victory: [523, 659, 784],
+      level: [659, 784, 988],
+      treasure: [784, 988],
+      boss: [392, 523, 659, 1046]
+    }[kind];
+
+    sequence.forEach((frequency, index) => {
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      oscillator.type = "square";
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0.04, now + index * 0.09);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.09 + 0.08);
+      oscillator.connect(gain);
+      gain.connect(audio.destination);
+      oscillator.start(now + index * 0.09);
+      oscillator.stop(now + index * 0.09 + 0.08);
+    });
+  } catch {
+    // Audio is optional; logs and screen state still carry the result.
+  }
 }
