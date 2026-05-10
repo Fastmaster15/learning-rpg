@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react";
-import { DashboardCard } from "@/components/DashboardCard";
 import type { LearningRpgDashboard, LearningRpgStage, LearningRpgTheme } from "@/lib/learning-rpg";
 
 const STORAGE_KEY = "my-independent-os.learning-rpg.v2";
@@ -123,7 +122,7 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
     window.history.replaceState({}, "", url.toString());
   }, [activeThemeId, ready]);
 
-  const activeTheme = dashboard.themes.find((theme) => theme.theme_id === PLAYABLE_THEME_ID) ?? dashboard.themes[0];
+  const activeTheme = dashboard.themes.find((theme) => theme.theme_id === activeThemeId) ?? dashboard.themes.find((theme) => theme.theme_id === PLAYABLE_THEME_ID) ?? dashboard.themes[0];
   const firstWorld = activeTheme.worlds[0];
   const firstStage = firstWorld?.stages[0];
   const chapterStages = firstWorld?.stages.slice(0, 1) ?? [];
@@ -137,56 +136,163 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
 
   if (!gameStarted) {
     return (
-      <div className="grid gap-4">
-        <section className="overflow-hidden rounded-[30px] border border-[#2d3d50] bg-[radial-gradient(circle_at_top,#324457_0%,#1c2634_45%,#0e1320_100%)] text-[#f6f0df] shadow-[0_22px_80px_rgba(17,24,39,0.35)]">
-          <div className="grid gap-6 px-6 py-8 md:px-8 md:py-10 xl:grid-cols-[1.2fr_0.8fr] xl:items-start">
-            <div className="space-y-4">
-              <p className="text-[11px] font-semibold tracking-[0.3em] text-[#c8d1d6] uppercase">Retro Learning RPG</p>
-              <h1 className="text-4xl font-black tracking-tight text-white md:text-5xl">Learning RPG</h1>
+      <div className="overflow-hidden rounded-[32px] border border-[#415968] bg-[radial-gradient(circle_at_top,#2f4251_0%,#1c2630_42%,#0c1117_100%)] text-[#f4eddc] shadow-[0_28px_100px_rgba(17,24,39,0.42)]">
+        <div className="grid gap-6 px-5 py-6 md:px-8 md:py-8 xl:grid-cols-[1.05fr_0.95fr] xl:items-start">
+          <div className="space-y-5">
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold tracking-[0.28em] text-[#c6d2d8] uppercase">
+              <span>PROLOGUE</span>
+              <span className="text-[#7f97a5]">/</span>
+              <span>TITLE SCREEN</span>
+            </div>
+            <div className="space-y-3">
+              <h1 className="text-4xl font-black tracking-tight text-white md:text-6xl">Learning RPG</h1>
               <p className="max-w-2xl text-sm leading-7 text-[#d7e0e8] md:text-base">
-                まずは日本史の第1章だけ、軽く1プレイできるレトロコマンドRPGとして立ち上がるプロトタイプ。
-                タイトル画面から入り、1問クエストで敵を倒して EXP とアイテムを拾います。
+                開いた瞬間にゲーム画面に見えることを最優先にした、独自のレトロコマンドRPG風プロトタイプ。
+                まずは日本史の第1章を1プレイぶん遊べます。
               </p>
-              <div className="rounded-[22px] border border-[#5f7584] bg-[#101820]/80 px-4 py-4">
-                <p className="text-[11px] font-semibold tracking-[0.2em] text-[#c8d1d6] uppercase">PLAYABLE CHAPTER</p>
-                <p className="mt-2 text-lg font-black text-white">{activeTheme.name}</p>
-                <p className="mt-2 text-sm leading-6 text-[#d7e0e8]">
-                  いま遊べるのは <span className="font-semibold text-[#f3c57a]">第1章「{firstStage?.title ?? "はじまりの章"}」</span> だけ。
-                  まずは1回クリアして、ゲームの手触りを見てください。
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3">
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ["はじめる", "冒険画面へ進む"],
+                ["つづきから", "前回の状態から再開"],
+                ["せってい", "音量や表示を確認"]
+              ].map(([label, help]) => (
                 <button
+                  key={label}
                   type="button"
                   onClick={() => setGameStarted(true)}
-                  className="rounded-full border border-[#f3c57a] bg-[#f3c57a] px-5 py-3 text-sm font-bold text-[#16222d] shadow-lg shadow-[#f3c57a]/20 transition hover:bg-white"
+                  className="rounded-[22px] border border-[#5f7584] bg-[#101820] px-4 py-4 text-left transition hover:border-[#f3c57a] hover:bg-[#151e28]"
                 >
-                  はじめる
+                  <p className="text-[11px] font-semibold tracking-[0.18em] text-[#b7c5ce] uppercase">{label}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#f4eddc]">{help}</p>
                 </button>
-                <span className="rounded-full border border-[#5f7584] bg-[#101820] px-4 py-3 text-sm font-semibold text-[#d7e0e8]">
-                  {dashboard.engine.name}
-                </span>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setGameStarted(true)}
+                className="rounded-full border border-[#f3c57a] bg-[#f3c57a] px-5 py-3 text-sm font-bold text-[#16222d] shadow-lg shadow-[#f3c57a]/20 transition hover:bg-white"
+              >
+                はじめる
+              </button>
+              <Link
+                href="/product-lab"
+                className="rounded-full border border-[#5f7584] bg-[#101820] px-5 py-3 text-sm font-semibold text-[#d7e0e8] transition hover:border-[#f3c57a] hover:text-white"
+              >
+                Product Labへ
+              </Link>
+            </div>
+
+            <div className="rounded-[22px] border border-[#5f7584] bg-[#101820]/85 px-4 py-4">
+              <p className="text-[11px] font-semibold tracking-[0.2em] text-[#c8d1d6] uppercase">NOW PLAYABLE</p>
+              <p className="mt-2 text-lg font-black text-white">{activeTheme.name}</p>
+              <p className="mt-2 text-sm leading-6 text-[#d7e0e8]">
+                いま遊べるのは <span className="font-semibold text-[#f3c57a]">第1章「{firstStage?.title ?? "はじまりの章"}」</span> だけ。
+                まずは1回クリアして、敵HPが減る・EXPが入る・アイテムが出る流れを確かめてください。
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4">
+            <div className="rounded-[28px] border border-[#5f7584] bg-[linear-gradient(180deg,#1a2a35_0%,#101820_100%)] p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-[0.2em] text-[#c8d1d6] uppercase">FIELD PREVIEW</p>
+                  <h2 className="mt-1 text-2xl font-black text-white">{firstWorld?.title ?? "第1章のフィールド"}</h2>
+                </div>
+                <div className="rounded-[18px] border border-[#5f7584] bg-[#0c1117] px-3 py-2 text-right">
+                  <p className="text-[10px] font-semibold tracking-[0.18em] text-[#b7c5ce] uppercase">CHAPTER</p>
+                  <p className="mt-1 text-lg font-black text-[#f3c57a]">01</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-[28px] border border-[#4d674f] bg-[#132016] p-3">
+                <div className="grid aspect-[12/8] grid-cols-12 grid-rows-8 overflow-hidden rounded-[24px] border border-[#5f7c67] bg-[#84b9e2]">
+                  {historyFieldTiles.flatMap((row, rowIndex) =>
+                    row.map((tile, colIndex) => (
+                      <div
+                        key={`${rowIndex}-${colIndex}`}
+                        className={`border border-black/10 ${
+                          tile === "water"
+                            ? "bg-[#7fb2df]"
+                            : tile === "shore"
+                              ? "bg-[#b8d6c6]"
+                              : tile === "road"
+                                ? "bg-[#d8c48d]"
+                                : tile === "hill"
+                                  ? "bg-[#88aa63]"
+                                  : tile === "mountain"
+                                    ? "bg-[#6f8671]"
+                                    : "bg-[#91bd74]"
+                        }`}
+                      />
+                    ))
+                  )}
+                </div>
+                <div className="relative -mt-[100%] h-0">
+                  <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(255,255,255,0.08),transparent_35%)]" />
+                  <div className="absolute left-[12%] top-[56%]">
+                    <MapMarker
+                      label="縄文の村"
+                      sublabel="土器と暮らし"
+                      active={selectedStage?.stage_id === "history_w1_s1_jomon"}
+                      onClick={() => selectStage("history_w1_s1_jomon")}
+                    />
+                  </div>
+                  <div className="absolute left-[45%] top-[40%]">
+                    <MapMarker
+                      label="稲作の道"
+                      sublabel="次の章"
+                      locked
+                      active={false}
+                      onClick={() => selectStage("history_w1_s2_yayoi")}
+                    />
+                  </div>
+                  <div className="absolute left-[72%] top-[27%]">
+                    <MapMarker label="弥生の丘" sublabel="準備中" locked active={false} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                <div className="rounded-[18px] border border-[#40505c] bg-[#0c1117] px-3 py-3">
+                  <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">START</p>
+                  <p className="mt-1 text-sm font-bold text-white">縄文の村</p>
+                </div>
+                <div className="rounded-[18px] border border-[#40505c] bg-[#0c1117] px-3 py-3">
+                  <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">ROUTE</p>
+                  <p className="mt-1 text-sm font-bold text-white">土器と暮らし → 稲作の広がり</p>
+                </div>
+                <div className="rounded-[18px] border border-[#40505c] bg-[#0c1117] px-3 py-3">
+                  <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">NEXT</p>
+                  <p className="mt-1 text-sm font-bold text-white">1問クエストへ進む</p>
+                </div>
               </div>
             </div>
 
-            <div className="grid gap-3">
-              <div className="rounded-[22px] border border-[#f3c57a]/50 bg-[#101820] p-4 text-left shadow-[0_0_0_1px_rgba(243,197,122,0.18)]">
-                <p className="text-[11px] font-semibold tracking-[0.2em] text-[#8aa0ad] uppercase">{activeTheme.worldview}</p>
-                <h2 className="mt-2 text-lg font-black text-white">{activeTheme.name}</h2>
-                <p className="mt-2 text-sm leading-6 text-[#d7e0e8]">{activeTheme.description}</p>
-                <p className="mt-3 text-xs leading-5 text-[#b7c5ce]">
-                  まずはこの1テーマだけで、タイトル画面から第1章クリアまでの手触りを確認する。
-                </p>
-              </div>
-              <div className="rounded-[22px] border border-[#5f7584] bg-[#101820] p-4 text-left">
-                <p className="text-[11px] font-semibold tracking-[0.2em] text-[#8aa0ad] uppercase">NEXT</p>
-                <p className="mt-2 text-sm leading-6 text-[#d7e0e8]">
-                  第2章以降や Python / English は、まず第1章の手触りを固めてから追加する。
-                </p>
-              </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {dashboard.themes.map((theme) => (
+                <button
+                  key={theme.theme_id}
+                  type="button"
+                  onClick={() => selectTheme(theme.theme_id)}
+                  className={`rounded-[20px] border px-4 py-4 text-left transition ${
+                    theme.theme_id === activeTheme.theme_id
+                      ? "border-[#f3c57a] bg-[#101820]"
+                      : "border-[#5f7584] bg-[#101820]/80 hover:border-[#f3c57a]"
+                  }`}
+                >
+                  <p className="text-[10px] font-semibold tracking-[0.18em] text-[#b7c5ce] uppercase">THEME</p>
+                  <p className="mt-2 text-sm font-black text-white">{theme.name}</p>
+                  <p className="mt-1 text-xs leading-5 text-[#d7e0e8]">{theme.description}</p>
+                </button>
+              ))}
             </div>
           </div>
-        </section>
+        </div>
       </div>
     );
   }
@@ -270,240 +376,201 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
 
   return (
     <div className="grid gap-4">
-      <section className="overflow-hidden rounded-xl border border-[#d7e7ec] bg-[linear-gradient(135deg,#f7fbfc_0%,#f7fbfa_48%,#fffaf2_100%)] shadow-sm shadow-stone-200/70">
-        <div className="grid gap-5 px-5 py-6 md:px-7 xl:grid-cols-[1.15fr_0.85fr] xl:items-start">
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold tracking-[0.18em] text-[#53766f] uppercase">
-              <span>Product Lab</span>
-              <span className="text-[#b8c8c3]">/</span>
-              <span>Learning RPG</span>
-              <span className="text-[#b8c8c3]">/</span>
-              <span>MVP</span>
-            </div>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <div className="rounded-full border border-[#d8c5a2] bg-white px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-[#8a6f4f] uppercase">
-                  PRESS START
+      <section className="overflow-hidden rounded-[32px] border border-[#415968] bg-[linear-gradient(180deg,#1b2833_0%,#101820_100%)] text-[#f4eddc] shadow-[0_28px_100px_rgba(17,24,39,0.34)]">
+        <div className="grid gap-4 px-4 py-4 md:px-6 md:py-6 xl:grid-cols-[1.08fr_0.92fr] xl:items-start">
+          <div className="grid gap-4">
+            <RetroPanel title="WORLD MAP" subtitle={`第1章の進行: ${firstWorld?.title ?? "冒険の地図"}`} accent="green">
+              <div className="grid gap-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-semibold tracking-[0.22em] text-[#b7c5b4] uppercase">PLAYER STATUS</p>
+                    <h2 className="mt-1 text-2xl font-black text-white">{activeTheme.player.title}</h2>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <SummaryPill label="LV" value={hero.level} />
+                    <SummaryPill label="EXP" value={hero.exp} />
+                    <SummaryPill label="NEXT" value={hero.nextLevelExp} />
+                  </div>
                 </div>
-                <h1 className="text-3xl font-black text-slate-900 md:text-4xl">{dashboard.engine.name}</h1>
-              </div>
-              <p className="max-w-3xl text-sm leading-7 text-slate-700 md:text-base">{dashboard.engine.summary}</p>
-              <p className="max-w-3xl text-sm leading-7 text-slate-600">{dashboard.engine.mvp_note}</p>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Link
-                href="/product-lab"
-                className="rounded-sm border border-[#d6c8b3] bg-[#fbf8f3] px-3 py-2 text-sm font-semibold text-[#8a6f4f] transition hover:bg-white"
-              >
-                Product Labへ戻る
-              </Link>
-              <span className="rounded-sm border border-[#d8e5e8] bg-white px-3 py-2 text-sm font-semibold text-[#53766f]">
-                {dashboard.themes.length} themes
-              </span>
-              <button
-                type="button"
-                onClick={() => setGameStarted(true)}
-                className="rounded-sm border border-[#f3c57a] bg-[#f3c57a] px-3 py-2 text-sm font-bold text-[#16222d] transition hover:bg-white"
-              >
-                はじめる
-              </button>
-            </div>
-          </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
-              {dashboard.engine.shared_parts.map((part) => (
-                <div key={part} className="rounded-sm border border-line bg-white px-4 py-3 shadow-sm shadow-stone-200/60">
-                  <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-500">ENGINE PART</p>
-                  <p className="mt-2 text-base font-bold text-slate-900">{part}</p>
-                </div>
-            ))}
-          </div>
-        </div>
-      </section>
+                <div className="rounded-[26px] border border-[#4d674f] bg-[#132016] p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3 px-1 pb-3">
+                    <div>
+                      <p className="text-[10px] font-semibold tracking-[0.22em] text-[#b7c5b4] uppercase">FIELD MAP</p>
+                      <h3 className="mt-1 text-lg font-black text-white">{firstWorld?.title ?? "第1章"}</h3>
+                    </div>
+                    <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-[#d7e4d7]">
+                      <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">村</span>
+                      <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">道</span>
+                      <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">丘</span>
+                      <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">城</span>
+                    </div>
+                  </div>
 
-      <DashboardCard title="第1章の進行" subtitle="まずは土器と暮らしだけを、1プレイぶん遊ぶ。">
-        <div className="grid gap-2 md:grid-cols-[1.35fr_0.65fr]">
-          <div className="rounded-sm border border-[#2f7f8f] bg-[#eef7fb] px-4 py-4 text-left shadow-sm">
-            <p className="text-[11px] font-semibold tracking-[0.16em] text-[#4f7a8d] uppercase">CURRENT QUEST</p>
-            <p className="mt-2 text-base font-bold text-slate-900">{selectedStage?.title}</p>
-            <p className="mt-1 text-sm text-slate-600">{selectedStage?.summary}</p>
-          </div>
-          <div className="rounded-sm border border-line bg-white px-4 py-4 shadow-sm">
-            <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">STATUS</p>
-            <p className="mt-2 text-sm font-semibold text-slate-900">章クリア {clearedStages}/{totalStages}</p>
-            <p className="mt-1 text-xs text-slate-500">まず1章をクリアして、ゲームの手触りを確認する。</p>
-          </div>
-        </div>
-      </DashboardCard>
+                  <div className="relative overflow-hidden rounded-[28px] border border-[#5f7c67] bg-[#80b4dd] shadow-inner shadow-black/20">
+                    <div className="grid aspect-[12/8] grid-cols-12 grid-rows-8">
+                      {historyFieldTiles.flatMap((row, rowIndex) =>
+                        row.map((tile, colIndex) => (
+                          <div
+                            key={`${rowIndex}-${colIndex}`}
+                            className={`border border-black/10 ${
+                              tile === "water"
+                                ? "bg-[#7eb1dc]"
+                                : tile === "shore"
+                                  ? "bg-[#b7d3c5]"
+                                  : tile === "road"
+                                    ? "bg-[#d8c48d]"
+                                    : tile === "hill"
+                                      ? "bg-[#88aa63]"
+                                      : tile === "mountain"
+                                        ? "bg-[#6f8671]"
+                                        : "bg-[#91bd74]"
+                            }`}
+                          />
+                        ))
+                      )}
+                    </div>
 
-      <DashboardCard title="WORLD MAP" subtitle="地図を歩き、村や道から1ステージに入る。">
-        <div className="grid gap-4 xl:grid-cols-[1.08fr_0.92fr]">
-          <div className="rounded-[28px] border border-[#9fc1ae] bg-[linear-gradient(180deg,#23372a_0%,#17251c_45%,#0f1511_100%)] p-4 text-[#f2f0e7] shadow-[0_18px_50px_rgba(17,24,39,0.22)]">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-[11px] font-semibold tracking-[0.22em] text-[#c9d6c6] uppercase">FIELD MAP</p>
-                <h3 className="mt-1 text-2xl font-black text-white">{activeTheme.name}</h3>
-                <p className="mt-2 max-w-2xl text-sm leading-6 text-[#d8e2d8]">{activeTheme.description}</p>
-              </div>
-              <div className="rounded-2xl border border-[#5f7c67] bg-[#101913] px-4 py-3 text-center">
-                <p className="text-[10px] font-semibold tracking-[0.18em] text-[#b7c5b4] uppercase">CHAPTER</p>
-                <p className="mt-1 text-lg font-black text-[#f3c57a]">{clearedStages}/{totalStages}</p>
-              </div>
-            </div>
+                    <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(255,255,255,0.08),transparent_35%)]" />
 
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <div className="rounded-[18px] border border-[#536c57] bg-[#101913] px-3 py-3">
-                <p className="text-[10px] font-semibold tracking-[0.14em] text-[#b7c5b4] uppercase">PLAYER LV</p>
-                <p className="mt-1 text-xl font-black text-white">{hero.level}</p>
-              </div>
-              <div className="rounded-[18px] border border-[#536c57] bg-[#101913] px-3 py-3">
-                <p className="text-[10px] font-semibold tracking-[0.14em] text-[#b7c5b4] uppercase">EXP</p>
-                <p className="mt-1 text-xl font-black text-[#8de0b1]">{hero.exp.toLocaleString()}</p>
-              </div>
-              <div className="rounded-[18px] border border-[#536c57] bg-[#101913] px-3 py-3">
-                <p className="text-[10px] font-semibold tracking-[0.14em] text-[#b7c5b4] uppercase">NEXT</p>
-                <p className="mt-1 text-xl font-black text-white">{hero.nextLevelExp.toLocaleString()}</p>
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-[28px] border border-[#4d674f] bg-[#132016] p-3">
-              <div className="flex flex-wrap items-center justify-between gap-3 px-1 pb-3">
-                <div>
-                  <p className="text-[10px] font-semibold tracking-[0.22em] text-[#b7c5b4] uppercase">OVERWORLD</p>
-                  <h4 className="mt-1 text-base font-black text-white">{firstWorld?.title ?? "第1章の地図"}</h4>
-                </div>
-                <div className="flex flex-wrap gap-2 text-[11px] font-semibold text-[#d7e4d7]">
-                  <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">村</span>
-                  <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">道</span>
-                  <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">丘</span>
-                  <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1">目的地</span>
-                </div>
-              </div>
-
-              <div className="relative overflow-hidden rounded-[28px] border border-[#5f7c67] bg-[#80b4dd] shadow-inner shadow-black/20">
-                <div className="grid aspect-[12/8] grid-cols-12 grid-rows-8">
-                  {historyFieldTiles.flatMap((row, rowIndex) =>
-                    row.map((tile, colIndex) => (
-                      <div
-                        key={`${rowIndex}-${colIndex}`}
-                        className={`border border-black/10 ${
-                          tile === "water"
-                            ? "bg-[#7eb1dc]"
-                            : tile === "shore"
-                              ? "bg-[#b7d3c5]"
-                              : tile === "road"
-                                ? "bg-[#d8c48d]"
-                                : tile === "hill"
-                                  ? "bg-[#88aa63]"
-                                  : tile === "mountain"
-                                    ? "bg-[#6f8671]"
-                                    : "bg-[#91bd74]"
-                        }`}
+                    <div className="absolute left-[12%] top-[56%]">
+                      <MapMarker
+                        label="縄文の村"
+                        sublabel="土器と暮らし"
+                        active={selectedStage?.stage_id === "history_w1_s1_jomon"}
+                        onClick={() => selectStage("history_w1_s1_jomon")}
                       />
-                    ))
-                  )}
+                    </div>
+                    <div className="absolute left-[45%] top-[40%]">
+                      <MapMarker
+                        label="稲作の道"
+                        sublabel="次の章"
+                        locked
+                        active={false}
+                        onClick={() => selectStage("history_w1_s2_yayoi")}
+                      />
+                    </div>
+                    <div className="absolute left-[72%] top-[27%]">
+                      <MapMarker label="弥生の丘" sublabel="準備中" locked active={false} />
+                    </div>
+                    <div className="absolute left-[26%] top-[68%] h-1 w-[32%] rounded-full bg-[#f3c57a]/50" />
+                    <div className="absolute left-[50%] top-[47%] h-1 w-[22%] rotate-[-14deg] rounded-full bg-[#f3c57a]/35" />
+                  </div>
                 </div>
 
-                <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(255,255,255,0.08),transparent_35%)]" />
-
-                <div className="absolute left-[12%] top-[56%]">
-                  <MapMarker
-                    label="縄文の村"
-                    sublabel="土器と暮らし"
-                    active={selectedStage?.stage_id === "history_w1_s1_jomon"}
-                    onClick={() => selectStage("history_w1_s1_jomon")}
-                  />
-                </div>
-                <div className="absolute left-[45%] top-[40%]">
-                  <MapMarker
-                    label="稲作の道"
-                    sublabel="次の章"
-                    locked
-                    active={false}
-                    onClick={() => selectStage("history_w1_s2_yayoi")}
-                  />
-                </div>
-                <div className="absolute left-[72%] top-[27%]">
-                  <MapMarker label="弥生の丘" sublabel="準備中" locked active={false} />
-                </div>
-
-                <div className="absolute left-[26%] top-[68%] h-1 w-[32%] rounded-full bg-[#f3c57a]/50" />
-                <div className="absolute left-[50%] top-[47%] h-1 w-[22%] rotate-[-14deg] rounded-full bg-[#f3c57a]/35" />
-              </div>
-
-              <div className="mt-3 grid gap-2 sm:grid-cols-3">
-                <div className="rounded-[18px] border border-[#40505c] bg-[#101913] px-3 py-3 text-[#e7f0e4]">
-                  <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">START</p>
-                  <p className="mt-1 text-sm font-bold text-white">縄文の村</p>
-                </div>
-                <div className="rounded-[18px] border border-[#40505c] bg-[#101913] px-3 py-3 text-[#e7f0e4]">
-                  <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">ROUTE</p>
-                  <p className="mt-1 text-sm font-bold text-white">土器と暮らし → 稲作の広がり</p>
-                </div>
-                <div className="rounded-[18px] border border-[#40505c] bg-[#101913] px-3 py-3 text-[#e7f0e4]">
-                  <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">EXIT</p>
-                  <p className="mt-1 text-sm font-bold text-white">まずは1章クリア</p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-[18px] border border-[#40505c] bg-[#101913] px-3 py-3">
+                    <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">START</p>
+                    <p className="mt-1 text-sm font-bold text-white">縄文の村</p>
+                  </div>
+                  <div className="rounded-[18px] border border-[#40505c] bg-[#101913] px-3 py-3">
+                    <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">ROUTE</p>
+                    <p className="mt-1 text-sm font-bold text-white">土器と暮らし → 稲作の広がり</p>
+                  </div>
+                  <div className="rounded-[18px] border border-[#40505c] bg-[#101913] px-3 py-3">
+                    <p className="text-[10px] font-semibold tracking-[0.16em] text-[#b7c5b4] uppercase">NEXT QUEST</p>
+                    <p className="mt-1 text-sm font-bold text-white">{selectedStage?.title ?? "ステージを選択"}</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            </RetroPanel>
+
+            <RetroPanel title="COMMAND WINDOW" subtitle="地図のノードを選び、戦闘へ進む。" accent="gold">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => selectedStage && enterBattle(selectedStage.stage_id)}
+                  className="rounded-[18px] border border-[#f3c57a] bg-[#f3c57a] px-4 py-4 text-left font-bold text-[#16222d] transition hover:bg-white"
+                >
+                  <p className="text-[11px] tracking-[0.18em] uppercase">START QUEST</p>
+                  <p className="mt-1 text-sm leading-6">1問クエストを始める</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => selectedStage && advanceStage(activeTheme, selectedStage.stage_id, progress, setThemeProgress, setActivityMessage)}
+                  className="rounded-[18px] border border-[#5f7584] bg-[#101820] px-4 py-4 text-left font-bold text-[#f4eddc] transition hover:border-[#f3c57a]"
+                >
+                  <p className="text-[11px] tracking-[0.18em] uppercase text-[#b7c5ce]">MAP ACTION</p>
+                  <p className="mt-1 text-sm leading-6">ノードを開始 / クリアする</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivityMessage(`ヒント: ${battle.question.choices[battle.question.answerIndex]}`)}
+                  className="rounded-[18px] border border-[#5f7584] bg-[#101820] px-4 py-4 text-left font-bold text-[#f4eddc] transition hover:border-[#f3c57a]"
+                >
+                  <p className="text-[11px] tracking-[0.18em] uppercase text-[#b7c5ce]">MAGIC</p>
+                  <p className="mt-1 text-sm leading-6">ヒントをひらく</p>
+                </button>
+                <Link
+                  href="/product-lab"
+                  className="rounded-[18px] border border-[#5f7584] bg-[#101820] px-4 py-4 text-left font-bold text-[#f4eddc] transition hover:border-[#f3c57a]"
+                >
+                  <p className="text-[11px] tracking-[0.18em] uppercase text-[#b7c5ce]">RETURN</p>
+                  <p className="mt-1 text-sm leading-6">Product Labへ戻る</p>
+                </Link>
+              </div>
+            </RetroPanel>
           </div>
 
           <div className="grid gap-4">
-            <div className="rounded-[28px] border border-[#d9d0bd] bg-[linear-gradient(180deg,#1f3341_0%,#121a23_100%)] p-4 text-[#f4eddc] shadow-[0_16px_50px_rgba(17,24,39,0.18)]">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold tracking-[0.24em] text-[#c8d1d6] uppercase">BATTLE SCREEN</p>
-                  <h3 className="mt-1 text-2xl font-black">{selectedStage?.title ?? "フィールドで敵を選んでください"}</h3>
-                </div>
-                <div className="rounded-full border border-[#5f7584] bg-[#18222c] px-3 py-2 text-xs font-semibold text-[#d7e2e8]">
-                  {selectedStage ? getDeviceLabel(selectedStage.device_requirement) : "FIELD"}
-                </div>
-              </div>
-
-              <div className="mt-4 rounded-[24px] border border-[#40505c] bg-[radial-gradient(circle_at_top,#2d4659_0%,#16222d_45%,#101820_100%)] p-4">
+            <RetroPanel title="BATTLE SCREEN" subtitle="敵と向き合い、1問で撃破する。" accent="red">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="text-[10px] font-semibold tracking-[0.22em] text-[#c8d1d6] uppercase">ENEMY</p>
-                    <h4 className="mt-2 text-xl font-black text-white">{battle.enemyName}</h4>
+                    <h3 className="mt-1 text-2xl font-black text-white">{battle.enemyName}</h3>
                   </div>
                   <div className="rounded-[22px] border border-[#576b76] bg-[#101820] px-4 py-3 text-center">
                     <p className="text-[10px] font-semibold tracking-[0.18em] text-[#c8d1d6] uppercase">HP</p>
                     <p className="mt-1 text-2xl font-black text-[#f3c57a]">{battle.enemyHp}</p>
                   </div>
                 </div>
-                <div className="mt-4 h-4 overflow-hidden rounded-full bg-[#0c1117]">
+                <div className="h-4 overflow-hidden rounded-full bg-[#0c1117]">
                   <div className="h-full rounded-full bg-[#d83b31] transition-all duration-500" style={{ width: `${Math.max(0, (battle.enemyHp / battle.enemyMaxHp) * 100)}%` }} />
                 </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                <div className="grid gap-2 sm:grid-cols-2">
                   <BattleStat label="MODE" value={battle.phase === "field" ? "FIELD" : battle.phase === "battle" ? "BATTLE" : "VICTORY"} />
                   <BattleStat label="TARGET" value={selectedStage?.stage_type ?? "unknown"} />
                 </div>
-                <div className="mt-4 rounded-[22px] border border-[#40505c] bg-[#0f1720] px-4 py-4 text-center">
+                <div className="rounded-[22px] border border-[#40505c] bg-[#0f1720] px-4 py-4 text-center">
                   <p className="text-[10px] font-semibold tracking-[0.2em] text-[#8aa0ad] uppercase">QUEST</p>
                   <p className="mt-2 text-sm leading-6 text-[#f4eddc]">{battle.question.prompt}</p>
                 </div>
-              </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                <div className="rounded-[20px] border border-[#40505c] bg-[#101820] p-4">
-                  <p className="text-[11px] font-semibold tracking-[0.2em] text-[#c8d1d6] uppercase">PLAYER</p>
-                  <h4 className="mt-2 text-lg font-black text-white">
-                    Lv.{hero.level} {activeTheme.player.title}
-                  </h4>
-                  <p className="mt-1 text-sm text-[#c6d1d9]">{activeTheme.description}</p>
-                  <p className="mt-3 text-2xl font-black text-[#8de0b1]">{battle.playerHp}</p>
-                  <div className="mt-3 h-3 overflow-hidden rounded-full bg-[#0c1117]">
-                    <div className="h-full rounded-full bg-[#2f7f8f] transition-all duration-500" style={{ width: `${Math.max(0, (battle.playerHp / battle.playerMaxHp) * 100)}%` }} />
-                  </div>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {["こうげき", "まほう", "どうぐ", "にげる"].map((label) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => {
+                        if (label === "まほう") {
+                          setActivityMessage(`ヒント: ${battle.question.choices[battle.question.answerIndex]}`);
+                          return;
+                        }
+                        if (label === "どうぐ") {
+                          setActivityMessage(hero.items.length ? `どうぐ: ${hero.items.join(" / ")}` : "まだどうぐはない。");
+                          return;
+                        }
+                        if (label === "にげる") {
+                          setActivityMessage("いったん引き返した。");
+                          return;
+                        }
+                        setActivityMessage("こうげきを選択。下のクエストで答えよう。");
+                      }}
+                      className="rounded-[18px] border border-[#5f7584] bg-[#101820] px-3 py-3 text-left text-sm font-semibold text-[#f4eddc] transition hover:border-[#f3c57a] hover:text-white"
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="rounded-[20px] border border-[#40505c] bg-[#17222d] p-4">
-                  <p className="text-[11px] font-semibold tracking-[0.2em] text-[#c8d1d6] uppercase">COMMAND</p>
-                  <div className="mt-3 grid grid-cols-2 gap-2">
+                <div className="rounded-[22px] border border-[#40505c] bg-[#17222d] p-4">
+                  <p className="text-[11px] font-semibold tracking-[0.2em] text-[#c8d1d6] uppercase">CHOICE</p>
+                  <div className="mt-3 grid grid-cols-1 gap-2">
                     {battle.question.choices.map((choice, choiceIndex) => (
                       <BattleCommandButton
                         key={choice}
-                        label={choice}
+                        label={`${String.fromCharCode(65 + choiceIndex)}. ${choice}`}
                         onClick={() => submitQuestAnswer(choiceIndex)}
                         disabled={battle.phase === "victory" || !selectedStage}
                       />
@@ -515,110 +582,83 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
                   </div>
                 </div>
               </div>
-            </div>
+            </RetroPanel>
 
-            <div className="rounded-[24px] border border-[#d9d0bd] bg-[#fffaf2] p-4 shadow-sm">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p className="text-[11px] font-semibold tracking-[0.14em] text-[#8a6f4f]">CURRENT QUEST</p>
-                  <h3 className="mt-1 text-2xl font-black text-slate-900">{selectedStage?.title ?? "ステージを選択してください"}</h3>
+            <RetroPanel title="QUEST LOG" subtitle="第1章を1プレイで追えるように、報酬と節目を並べる。" accent="blue">
+              <div className="space-y-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold tracking-[0.14em] text-[#8aa0ad] uppercase">CURRENT QUEST</p>
+                    <h3 className="mt-1 text-2xl font-black text-white">{selectedStage?.title ?? "ステージを選択してください"}</h3>
+                  </div>
+                  <span className="rounded-full border border-[#e0c79c] bg-[#101820] px-3 py-1 text-xs font-semibold text-[#f3c57a]">
+                    {battle.result === "correct" ? "勝利" : battle.result === "wrong" ? "要リトライ" : "進行中"}
+                  </span>
                 </div>
-                <span className="rounded-full border border-[#e0c79c] bg-white px-3 py-1 text-xs font-semibold text-[#9a5b1f]">
-                  {battle.result === "correct" ? "勝利" : battle.result === "wrong" ? "要リトライ" : "進行中"}
-                </span>
+                <p className="text-sm leading-6 text-[#d7e0e8]">{selectedStage?.summary ?? "ワールドマップから気になるステージを選ぶと、ここに出る。"}</p>
+                {selectedStage ? (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <InfoTile label="World" value={findWorldTitle(activeTheme, selectedStage.stage_id)} />
+                    <InfoTile label="EXP" value={`+${battle.question.expReward}`} />
+                    <InfoTile label="Stage Type" value={selectedStage.stage_type} />
+                    <InfoTile label="Device" value={getDeviceLabel(selectedStage.device_requirement)} />
+                  </div>
+                ) : null}
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div className="rounded-2xl border border-[#40505c] bg-[#101820] px-4 py-3">
+                    <p className="text-[10px] font-semibold tracking-[0.14em] text-[#8a6f4f] uppercase">RESULT</p>
+                    <p className={`mt-2 text-sm font-bold ${battle.result === "correct" ? "text-[#8de0b1]" : battle.result === "wrong" ? "text-[#f0a08d]" : "text-[#d7e0e8]"}`}>{battle.log[0] ?? "はじめるを押してクエスト開始。"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#40505c] bg-[#101820] px-4 py-3">
+                    <p className="text-[10px] font-semibold tracking-[0.14em] text-[#8a6f4f] uppercase">LOOT</p>
+                    <p className="mt-2 text-sm font-bold text-white">{battle.lootItem ?? "まだ未入手"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#40505c] bg-[#101820] px-4 py-3">
+                    <p className="text-[10px] font-semibold tracking-[0.14em] text-[#8a6f4f] uppercase">LEVEL</p>
+                    <p className="mt-2 text-sm font-bold text-white">
+                      Lv.{hero.level} / NEXT {hero.nextLevelExp.toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <p className="text-xs leading-5 text-[#b7c5ce]">{activityMessage} この第1章の進行はこのブラウザの `localStorage` に保存されます。</p>
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-700">{selectedStage?.summary ?? "ワールドマップから気になるステージを選ぶと、ここに出る。"}</p>
-              {selectedStage ? (
-                <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                  <InfoTile label="World" value={findWorldTitle(activeTheme, selectedStage.stage_id)} />
-                  <InfoTile label="EXP" value={`+${battle.question.expReward}`} />
-                  <InfoTile label="Stage Type" value={selectedStage.stage_type} />
-                  <InfoTile label="Device" value={getDeviceLabel(selectedStage.device_requirement)} />
-                </div>
-              ) : null}
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => selectedStage && enterBattle(selectedStage.stage_id)}
-                  className="rounded-full border border-[#2f7f8f] bg-[#eef7fb] px-4 py-2 text-sm font-semibold text-[#1f6f91] transition hover:bg-white"
-                >
-                  戦う
-                </button>
-                <button
-                  type="button"
-                  onClick={() => selectedStage && advanceStage(activeTheme, selectedStage.stage_id, progress, setThemeProgress, setActivityMessage)}
-                  className="rounded-full border border-[#d6c8b3] bg-white px-4 py-2 text-sm font-semibold text-[#8a6f4f] transition hover:bg-[#fbf8f3]"
-                >
-                  第1章を開く
-                </button>
-                <Link
-                  href="/product-lab"
-                  className="rounded-full border border-[#d6c8b3] bg-white px-4 py-2 text-sm font-semibold text-[#8a6f4f] transition hover:bg-[#fbf8f3]"
-                >
-                  Product Labへ戻る
-                </Link>
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-3">
-                <div className="rounded-2xl border border-[#efe2cf] bg-white px-4 py-3">
-                  <p className="text-[10px] font-semibold tracking-[0.14em] text-[#8a6f4f] uppercase">RESULT</p>
-                  <p className={`mt-2 text-sm font-bold ${battle.result === "correct" ? "text-[#2f7a55]" : battle.result === "wrong" ? "text-[#9a3f1f]" : "text-slate-700"}`}>{battle.log[0] ?? "はじめるを押してクエスト開始。"}</p>
-                </div>
-                <div className="rounded-2xl border border-[#efe2cf] bg-white px-4 py-3">
-                  <p className="text-[10px] font-semibold tracking-[0.14em] text-[#8a6f4f] uppercase">LOOT</p>
-                  <p className="mt-2 text-sm font-bold text-slate-900">{battle.lootItem ?? "まだ未入手"}</p>
-                </div>
-                <div className="rounded-2xl border border-[#efe2cf] bg-white px-4 py-3">
-                  <p className="text-[10px] font-semibold tracking-[0.14em] text-[#8a6f4f] uppercase">LEVEL</p>
-                  <p className="mt-2 text-sm font-bold text-slate-900">
-                    Lv.{hero.level} / NEXT {hero.nextLevelExp.toLocaleString()}
-                  </p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs leading-5 text-slate-500">
-                {activityMessage} この第1章の進行はこのブラウザの `localStorage` に保存されます。
-              </p>
-            </div>
+            </RetroPanel>
 
-            <div className="grid gap-3 md:grid-cols-2">
-              <PolicyBlock title="スマホ" body={activeTheme.device_policy.mobile} />
-              <PolicyBlock title="デスクトップ" body={activeTheme.device_policy.desktop} />
+            <div className="grid gap-4 md:grid-cols-2">
+              <RetroPanel title="TREASURE" subtitle="学習概念を、あとで画像素材に差し替えやすい形で保持。" accent="green">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {activeTheme.items.map((item) => (
+                    <button
+                      key={item}
+                      type="button"
+                      onClick={() => setActivityMessage(`${item} を確認しました。`)}
+                      className="rounded-[18px] border border-[#5f7584] bg-[#101820] px-3 py-3 text-left text-sm font-semibold text-[#f4eddc] transition hover:border-[#f3c57a] hover:text-white"
+                    >
+                      {item}
+                    </button>
+                  ))}
+                </div>
+              </RetroPanel>
+
+              <RetroPanel title="BOSS LOG" subtitle="ワールドごとの理解確認や実装演習の節目。" accent="red">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {activeTheme.bosses.map((boss) => (
+                    <button
+                      key={boss}
+                      type="button"
+                      onClick={() => setActivityMessage(`${boss} をボスカードとして確認しました。`)}
+                      className="rounded-[18px] border border-[#5f7584] bg-[#101820] px-3 py-3 text-left transition hover:border-[#f3c57a]"
+                    >
+                      <p className="text-[10px] font-semibold tracking-[0.14em] text-[#b7c5ce] uppercase">BOSS</p>
+                      <p className="mt-1 text-sm font-bold text-white">{boss}</p>
+                    </button>
+                  ))}
+                </div>
+              </RetroPanel>
             </div>
           </div>
         </div>
-      </DashboardCard>
-
-      <div className="grid gap-4 xl:grid-cols-[1fr_1fr]">
-        <DashboardCard title="取得済みアイテム" subtitle="学習概念を、あとで画像素材に差し替えやすい形で保持。">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {activeTheme.items.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setActivityMessage(`${item} を確認しました。`)}
-                className="rounded-sm border border-line bg-white px-3 py-3 text-left text-sm font-semibold text-slate-800 shadow-sm transition hover:border-[#2f7f8f] hover:bg-[#f7fbfa]"
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </DashboardCard>
-
-        <DashboardCard title="ボスカード" subtitle="ワールドごとの理解確認や実装演習の節目。">
-          <div className="grid gap-2 sm:grid-cols-2">
-            {activeTheme.bosses.map((boss) => (
-              <button
-                key={boss}
-                type="button"
-                onClick={() => setActivityMessage(`${boss} をボスカードとして確認しました。`)}
-                className="rounded-sm border border-[#efe2cf] bg-[#fffaf2] px-3 py-3 text-left shadow-sm transition hover:border-[#d29e5d]"
-              >
-                <p className="text-[11px] font-semibold tracking-[0.14em] text-[#9a5b1f]">BOSS</p>
-                <p className="mt-1 text-sm font-bold text-slate-900">{boss}</p>
-              </button>
-            ))}
-          </div>
-        </DashboardCard>
-      </div>
+      </section>
     </div>
   );
 }
@@ -792,6 +832,35 @@ function MapMarker({
       <p className="mt-1 text-sm font-black leading-5">{label}</p>
       <p className="mt-1 text-[11px] leading-4 opacity-85">{sublabel}</p>
     </button>
+  );
+}
+
+function RetroPanel({
+  title,
+  subtitle,
+  children,
+  accent = "gold"
+}: {
+  title: string;
+  subtitle?: string;
+  children: React.ReactNode;
+  accent?: "gold" | "green" | "red" | "blue";
+}) {
+  const accentClasses: Record<typeof accent, string> = {
+    gold: "border-[#5f7584] bg-[linear-gradient(180deg,#1b2833_0%,#101820_100%)]",
+    green: "border-[#5f7c67] bg-[linear-gradient(180deg,#17251c_0%,#101820_100%)]",
+    red: "border-[#7c5f5f] bg-[linear-gradient(180deg,#2a1c1c_0%,#101820_100%)]",
+    blue: "border-[#5f7584] bg-[linear-gradient(180deg,#1c2a36_0%,#101820_100%)]"
+  };
+
+  return (
+    <section className={`rounded-[28px] border px-4 py-4 text-[#f4eddc] shadow-[0_16px_45px_rgba(17,24,39,0.18)] ${accentClasses[accent]}`}>
+      <div className="mb-4">
+        <p className="text-[10px] font-semibold tracking-[0.24em] text-[#c8d1d6] uppercase">{title}</p>
+        {subtitle ? <p className="mt-1 text-sm leading-6 text-[#d7e0e8]">{subtitle}</p> : null}
+      </div>
+      {children}
+    </section>
   );
 }
 
