@@ -7,7 +7,7 @@ export default function ProductLabPage() {
         <p className="text-xs font-semibold tracking-[0.3em] text-[#8a6f4f] uppercase">Product Lab</p>
         <h1 className="mt-3 text-3xl font-black tracking-tight text-slate-900">Learning RPG Entrance</h1>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-700 md:text-base">
-          この別レポジトリでは、Learning RPG の体験を先に育てます。まずはプロトタイプの入口として使ってください。
+          この別レポジトリでは、Learning RPG の体験を先に育てます。いまは日本史の第1章を軽く遊べるプロトタイプです。
         </p>
         <div className="mt-5">
           <Link
@@ -21,4 +21,3 @@ export default function ProductLabPage() {
     </main>
   );
 }
-

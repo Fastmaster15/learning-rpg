@@ -6,6 +6,7 @@ import { DashboardCard } from "@/components/DashboardCard";
 import type { LearningRpgDashboard, LearningRpgStage, LearningRpgTheme } from "@/lib/learning-rpg";
 
 const STORAGE_KEY = "my-independent-os.learning-rpg.v2";
+const PLAYABLE_THEME_ID = "japanese_history_rpg";
 
 type ThemeProgress = {
   selectedStageId: string;
@@ -69,7 +70,7 @@ type LearningRpgClientProps = {
 
 export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClientProps) {
   const defaultThemeId = getDefaultThemeId(dashboard, initialThemeId);
-  const [activeThemeId, setActiveThemeId] = useState(defaultThemeId);
+  const [activeThemeId, setActiveThemeId] = useState(getDefaultThemeId(dashboard, PLAYABLE_THEME_ID) || defaultThemeId);
   const [gameStarted, setGameStarted] = useState(false);
   const [themeProgress, setThemeProgress] = useState<Record<string, ThemeProgress>>(() => buildDefaultProgressMap(dashboard));
   const [battleStates, setBattleStates] = useState<Record<string, BattleState>>(() => buildDefaultBattleMap(dashboard));
@@ -83,11 +84,11 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
       setThemeProgress(mergeProgressMap(dashboard, saved.themes));
       setBattleStates(mergeBattleMap(dashboard, saved.battles));
       setHeroStates(mergeHeroMap(dashboard, saved.heroes));
-      setActiveThemeId(getDefaultThemeId(dashboard, saved.activeThemeId ?? initialThemeId));
+      setActiveThemeId(getDefaultThemeId(dashboard, PLAYABLE_THEME_ID));
       setGameStarted(Boolean(saved.gameStarted));
-      setActivityMessage("保存済みの進行を読み込みました。");
+      setActivityMessage("日本史の第1章を読み込みました。");
     } else if (initialThemeId) {
-      setActiveThemeId(getDefaultThemeId(dashboard, initialThemeId));
+      setActiveThemeId(getDefaultThemeId(dashboard, PLAYABLE_THEME_ID));
     }
     setReady(true);
   }, [dashboard, initialThemeId]);
@@ -111,11 +112,13 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
     window.history.replaceState({}, "", url.toString());
   }, [activeThemeId, ready]);
 
-  const activeTheme = dashboard.themes.find((theme) => theme.theme_id === activeThemeId) ?? dashboard.themes[0];
+  const activeTheme = dashboard.themes.find((theme) => theme.theme_id === PLAYABLE_THEME_ID) ?? dashboard.themes[0];
+  const firstWorld = activeTheme.worlds[0];
+  const firstStage = firstWorld?.stages[0];
   const progress = themeProgress[activeTheme.theme_id] ?? buildDefaultThemeProgress(activeTheme);
-  const battle = battleStates[activeTheme.theme_id] ?? buildBattleStateFromStage(activeTheme, progress.selectedStageId || findFirstStage(activeTheme)?.stage_id || "");
+  const battle = battleStates[activeTheme.theme_id] ?? buildBattleStateFromStage(activeTheme, firstStage?.stage_id || "");
   const hero = heroStates[activeTheme.theme_id] ?? buildDefaultHeroState(activeTheme);
-  const selectedStage = findStage(activeTheme, progress.selectedStageId) ?? findFirstStage(activeTheme);
+  const selectedStage = firstStage ?? findStage(activeTheme, progress.selectedStageId) ?? findFirstStage(activeTheme);
   const totalStages = countStages(activeTheme);
   const clearedStages = countStages(activeTheme, progress.stageStatuses, "cleared");
   const inProgressStages = countStages(activeTheme, progress.stageStatuses, "in_progress");
@@ -131,24 +134,16 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
               <p className="text-[11px] font-semibold tracking-[0.3em] text-[#c8d1d6] uppercase">Retro Learning RPG</p>
               <h1 className="text-4xl font-black tracking-tight text-white md:text-5xl">Learning RPG</h1>
               <p className="max-w-2xl text-sm leading-7 text-[#d7e0e8] md:text-base">
-                学習ダッシュボードではなく、遊んで進めるコマンドRPGとして立ち上がるプロトタイプ。
-                テーマを選んで、1問クエストで敵を倒し、EXP とアイテムを拾って進みます。
+                まずは日本史の第1章だけ、軽く1プレイできるレトロコマンドRPGとして立ち上がるプロトタイプ。
+                タイトル画面から入り、1問クエストで敵を倒して EXP とアイテムを拾います。
               </p>
-              <div className="flex flex-wrap gap-2">
-                {dashboard.themes.map((theme) => (
-                  <button
-                    key={theme.theme_id}
-                    type="button"
-                    onClick={() => selectTheme(theme.theme_id)}
-                    className={
-                      theme.theme_id === activeTheme.theme_id
-                        ? "rounded-full border border-[#f3c57a] bg-[#f3c57a] px-3 py-2 text-xs font-semibold text-[#16222d]"
-                        : "rounded-full border border-[#5f7584] bg-[#101820] px-3 py-2 text-xs font-semibold text-[#f6f0df] transition hover:border-[#f3c57a]"
-                    }
-                  >
-                    {theme.short_name}
-                  </button>
-                ))}
+              <div className="rounded-[22px] border border-[#5f7584] bg-[#101820]/80 px-4 py-4">
+                <p className="text-[11px] font-semibold tracking-[0.2em] text-[#c8d1d6] uppercase">PLAYABLE CHAPTER</p>
+                <p className="mt-2 text-lg font-black text-white">{activeTheme.name}</p>
+                <p className="mt-2 text-sm leading-6 text-[#d7e0e8]">
+                  いま遊べるのは <span className="font-semibold text-[#f3c57a]">第1章「{firstStage?.title ?? "はじまりの章"}」</span> だけ。
+                  まずは1回クリアして、ゲームの手触りを見てください。
+                </p>
               </div>
               <div className="flex flex-wrap gap-3">
                 <button
@@ -165,22 +160,20 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
             </div>
 
             <div className="grid gap-3">
-              {dashboard.themes.map((theme) => (
-                <button
-                  key={theme.theme_id}
-                  type="button"
-                  onClick={() => selectTheme(theme.theme_id)}
-                  className={
-                    theme.theme_id === activeTheme.theme_id
-                      ? "rounded-[22px] border border-[#f3c57a]/50 bg-[#101820] p-4 text-left shadow-[0_0_0_1px_rgba(243,197,122,0.18)]"
-                      : "rounded-[22px] border border-[#5f7584] bg-[#101820] p-4 text-left transition hover:border-[#f3c57a]"
-                  }
-                >
-                  <p className="text-[11px] font-semibold tracking-[0.2em] text-[#8aa0ad] uppercase">{theme.worldview}</p>
-                  <h2 className="mt-2 text-lg font-black text-white">{theme.name}</h2>
-                  <p className="mt-2 text-sm leading-6 text-[#d7e0e8]">{theme.description}</p>
-                </button>
-              ))}
+              <div className="rounded-[22px] border border-[#f3c57a]/50 bg-[#101820] p-4 text-left shadow-[0_0_0_1px_rgba(243,197,122,0.18)]">
+                <p className="text-[11px] font-semibold tracking-[0.2em] text-[#8aa0ad] uppercase">{activeTheme.worldview}</p>
+                <h2 className="mt-2 text-lg font-black text-white">{activeTheme.name}</h2>
+                <p className="mt-2 text-sm leading-6 text-[#d7e0e8]">{activeTheme.description}</p>
+                <p className="mt-3 text-xs leading-5 text-[#b7c5ce]">
+                  まずはこの1テーマだけで、タイトル画面から第1章クリアまでの手触りを確認する。
+                </p>
+              </div>
+              <div className="rounded-[22px] border border-[#5f7584] bg-[#101820] p-4 text-left">
+                <p className="text-[11px] font-semibold tracking-[0.2em] text-[#8aa0ad] uppercase">NEXT</p>
+                <p className="mt-2 text-sm leading-6 text-[#d7e0e8]">
+                  第2章以降や Python / English は、まず第1章の手触りを固めてから追加する。
+                </p>
+              </div>
             </div>
           </div>
         </section>
@@ -308,45 +301,28 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
-            {dashboard.engine.shared_parts.map((part) => (
-              <div key={part} className="rounded-sm border border-line bg-white px-4 py-3 shadow-sm shadow-stone-200/60">
-                <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-500">ENGINE PART</p>
-                <p className="mt-2 text-base font-bold text-slate-900">{part}</p>
-              </div>
+              {dashboard.engine.shared_parts.map((part) => (
+                <div key={part} className="rounded-sm border border-line bg-white px-4 py-3 shadow-sm shadow-stone-200/60">
+                  <p className="text-[11px] font-semibold tracking-[0.14em] text-slate-500">ENGINE PART</p>
+                  <p className="mt-2 text-base font-bold text-slate-900">{part}</p>
+                </div>
             ))}
           </div>
         </div>
       </section>
 
       <DashboardCard title="プレイ中のテーマ" subtitle="ボタンで切り替え、進行はこのブラウザに保存される。">
-        <div className="grid gap-2 md:grid-cols-3">
-          {dashboard.themes.map((theme) => {
-            const progressItem = themeProgress[theme.theme_id] ?? buildDefaultThemeProgress(theme);
-            const selected = theme.theme_id === activeTheme.theme_id;
-            const cleared = countStages(theme, progressItem.stageStatuses, "cleared");
-            const total = countStages(theme);
-            const progressCount = `${cleared}/${total} cleared`;
-            const themeHero = heroStates[theme.theme_id] ?? buildDefaultHeroState(theme);
-            const exp = themeHero.exp;
-
-            return (
-              <button
-                key={theme.theme_id}
-                type="button"
-                onClick={() => selectTheme(theme.theme_id)}
-                className={
-                  selected
-                    ? "rounded-sm border border-[#2f7f8f] bg-[#eef7fb] px-4 py-3 text-left shadow-sm"
-                    : "rounded-sm border border-line bg-white px-4 py-3 text-left shadow-sm transition hover:border-[#c2b096]"
-                }
-              >
-                <p className="text-sm font-bold text-slate-900">{theme.name}</p>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{theme.short_name}</p>
-                <p className="mt-2 text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">{progressCount}</p>
-                <p className="mt-1 text-xs font-semibold text-[#53766f]">Lv.{themeHero.level} / EXP {exp.toLocaleString()}</p>
-              </button>
-            );
-          })}
+        <div className="grid gap-2 md:grid-cols-[1.35fr_0.65fr]">
+          <div className="rounded-sm border border-[#2f7f8f] bg-[#eef7fb] px-4 py-4 text-left shadow-sm">
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-[#4f7a8d] uppercase">CURRENT QUEST</p>
+            <p className="mt-2 text-base font-bold text-slate-900">{activeTheme.name}</p>
+            <p className="mt-1 text-sm text-slate-600">まずは日本史の第1章だけ遊べる。ほかのテーマは準備中。</p>
+          </div>
+          <div className="rounded-sm border border-line bg-white px-4 py-4 shadow-sm">
+            <p className="text-[11px] font-semibold tracking-[0.16em] text-slate-500 uppercase">STATUS</p>
+            <p className="mt-2 text-sm font-semibold text-slate-900">Lv.{hero.level} / EXP {hero.exp.toLocaleString()}</p>
+            <p className="mt-1 text-xs text-slate-500">第1章のクリアで少しずつ伸びる。</p>
+          </div>
         </div>
       </DashboardCard>
 
@@ -383,19 +359,19 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
             </div>
 
             <div className="mt-4 rounded-[24px] border border-[#4d674f] bg-[linear-gradient(180deg,#2b4230_0%,#22362a_100%)] p-3">
-              {activeTheme.worlds.map((world, worldIndex) => (
-                <section key={world.world_id} className={worldIndex > 0 ? "mt-4" : ""}>
+              {firstWorld ? (
+                <section>
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <p className="text-[10px] font-semibold tracking-[0.22em] text-[#b7c5b4] uppercase">WORLD {worldIndex + 1}</p>
-                      <h4 className="mt-1 text-base font-black text-white">{world.title}</h4>
+                      <p className="text-[10px] font-semibold tracking-[0.22em] text-[#b7c5b4] uppercase">WORLD 1</p>
+                      <h4 className="mt-1 text-base font-black text-white">{firstWorld.title}</h4>
                     </div>
                     <span className="rounded-full border border-[#5f7c67] bg-[#101913] px-3 py-1 text-[11px] font-semibold text-[#c9d6c6]">
-                      {world.stages.length} nodes
+                      1 node
                     </span>
                   </div>
                   <div className="grid gap-2">
-                    {world.stages.map((stage, stageIndex) => (
+                    {firstWorld.stages.slice(0, 1).map((stage, stageIndex) => (
                       <StageRow
                         key={stage.stage_id}
                         stage={stage}
@@ -408,7 +384,7 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
                     ))}
                   </div>
                 </section>
-              ))}
+              ) : null}
             </div>
           </div>
 
@@ -513,7 +489,7 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
                   onClick={() => selectedStage && advanceStage(activeTheme, selectedStage.stage_id, progress, setThemeProgress, setActivityMessage)}
                   className="rounded-full border border-[#d6c8b3] bg-white px-4 py-2 text-sm font-semibold text-[#8a6f4f] transition hover:bg-[#fbf8f3]"
                 >
-                  ステージを進める
+                  第1章を開く
                 </button>
                 <Link
                   href="/product-lab"
@@ -539,7 +515,7 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
                 </div>
               </div>
               <p className="mt-3 text-xs leading-5 text-slate-500">
-                {activityMessage} このテーマの進行はこのブラウザの `localStorage` に保存されます。
+                {activityMessage} この第1章の進行はこのブラウザの `localStorage` に保存されます。
               </p>
             </div>
 

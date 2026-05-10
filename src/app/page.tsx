@@ -7,7 +7,7 @@ export default function HomePage() {
         <p className="text-xs font-semibold tracking-[0.3em] text-[#8a6f4f] uppercase">Learning RPG</p>
         <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">Learning RPG Repo</h1>
         <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-700 md:text-base">
-          別レポジトリで進める Learning RPG のスタンドアロン版です。テーマ切り替え、フィールド、戦闘画面をここで育てていきます。
+          別レポジトリで進める Learning RPG のスタンドアロン版です。まずは日本史の第1章を1プレイできる形で育てています。
         </p>
         <div className="mt-5">
           <Link
@@ -21,4 +21,3 @@ export default function HomePage() {
     </main>
   );
 }
-
