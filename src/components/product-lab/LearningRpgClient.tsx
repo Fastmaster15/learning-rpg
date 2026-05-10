@@ -14,11 +14,21 @@ type ThemeProgress = {
 
 type SavedState = {
   activeThemeId?: string;
+  gameStarted?: boolean;
   themes?: Record<string, ThemeProgress>;
   battles?: Record<string, BattleState>;
+  heroes?: Record<string, HeroState>;
 };
 
 type BattlePhase = "field" | "battle" | "victory";
+
+type QuestCard = {
+  prompt: string;
+  choices: string[];
+  answerIndex: number;
+  expReward: number;
+  lootItem: string;
+};
 
 type BattleState = {
   stageId: string;
@@ -28,13 +38,28 @@ type BattleState = {
   enemyMaxHp: number;
   playerHp: number;
   playerMaxHp: number;
+  question: QuestCard;
+  result?: "correct" | "wrong";
+  lootItem?: string;
+  expGain?: number;
+  leveledUp?: boolean;
   log: string[];
 };
 
 type BattleTurnResult = {
   state: BattleState;
   progress: ThemeProgress;
+  hero: HeroState;
   message: string;
+};
+
+type HeroState = {
+  level: number;
+  exp: number;
+  nextLevelExp: number;
+  hp: number;
+  maxHp: number;
+  items: string[];
 };
 
 type LearningRpgClientProps = {
@@ -45,8 +70,10 @@ type LearningRpgClientProps = {
 export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClientProps) {
   const defaultThemeId = getDefaultThemeId(dashboard, initialThemeId);
   const [activeThemeId, setActiveThemeId] = useState(defaultThemeId);
+  const [gameStarted, setGameStarted] = useState(false);
   const [themeProgress, setThemeProgress] = useState<Record<string, ThemeProgress>>(() => buildDefaultProgressMap(dashboard));
   const [battleStates, setBattleStates] = useState<Record<string, BattleState>>(() => buildDefaultBattleMap(dashboard));
+  const [heroStates, setHeroStates] = useState<Record<string, HeroState>>(() => buildDefaultHeroMap(dashboard));
   const [activityMessage, setActivityMessage] = useState<string>("カードを選んで、ステージを進めてみよう。");
   const [ready, setReady] = useState(false);
 
@@ -55,7 +82,9 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
     if (saved) {
       setThemeProgress(mergeProgressMap(dashboard, saved.themes));
       setBattleStates(mergeBattleMap(dashboard, saved.battles));
+      setHeroStates(mergeHeroMap(dashboard, saved.heroes));
       setActiveThemeId(getDefaultThemeId(dashboard, saved.activeThemeId ?? initialThemeId));
+      setGameStarted(Boolean(saved.gameStarted));
       setActivityMessage("保存済みの進行を読み込みました。");
     } else if (initialThemeId) {
       setActiveThemeId(getDefaultThemeId(dashboard, initialThemeId));
@@ -67,10 +96,12 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
     if (!ready) return;
     saveState({
       activeThemeId,
+      gameStarted,
       themes: themeProgress,
-      battles: battleStates
+      battles: battleStates,
+      heroes: heroStates
     });
-  }, [activeThemeId, battleStates, ready, themeProgress]);
+  }, [activeThemeId, battleStates, gameStarted, heroStates, ready, themeProgress]);
 
   useEffect(() => {
     if (!ready || typeof window === "undefined" || !activeThemeId) return;
@@ -83,15 +114,79 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
   const activeTheme = dashboard.themes.find((theme) => theme.theme_id === activeThemeId) ?? dashboard.themes[0];
   const progress = themeProgress[activeTheme.theme_id] ?? buildDefaultThemeProgress(activeTheme);
   const battle = battleStates[activeTheme.theme_id] ?? buildBattleStateFromStage(activeTheme, progress.selectedStageId || findFirstStage(activeTheme)?.stage_id || "");
+  const hero = heroStates[activeTheme.theme_id] ?? buildDefaultHeroState(activeTheme);
   const selectedStage = findStage(activeTheme, progress.selectedStageId) ?? findFirstStage(activeTheme);
   const totalStages = countStages(activeTheme);
   const clearedStages = countStages(activeTheme, progress.stageStatuses, "cleared");
   const inProgressStages = countStages(activeTheme, progress.stageStatuses, "in_progress");
   const lockedStages = countStages(activeTheme, progress.stageStatuses, "locked");
-  const initialClearedExp = sumStageExp(activeTheme, buildDefaultThemeProgress(activeTheme).stageStatuses, "cleared");
-  const currentClearedExp = sumStageExp(activeTheme, progress.stageStatuses, "cleared");
-  const currentExp = activeTheme.player.exp + currentClearedExp - initialClearedExp;
-  const expRate = Math.min(100, Math.round((currentExp / activeTheme.player.next_level_exp) * 100));
+  const expRate = Math.min(100, Math.round((hero.exp / hero.nextLevelExp) * 100));
+
+  if (!gameStarted) {
+    return (
+      <div className="grid gap-4">
+        <section className="overflow-hidden rounded-[30px] border border-[#2d3d50] bg-[radial-gradient(circle_at_top,#324457_0%,#1c2634_45%,#0e1320_100%)] text-[#f6f0df] shadow-[0_22px_80px_rgba(17,24,39,0.35)]">
+          <div className="grid gap-6 px-6 py-8 md:px-8 md:py-10 xl:grid-cols-[1.2fr_0.8fr] xl:items-start">
+            <div className="space-y-4">
+              <p className="text-[11px] font-semibold tracking-[0.3em] text-[#c8d1d6] uppercase">Retro Learning RPG</p>
+              <h1 className="text-4xl font-black tracking-tight text-white md:text-5xl">Learning RPG</h1>
+              <p className="max-w-2xl text-sm leading-7 text-[#d7e0e8] md:text-base">
+                学習ダッシュボードではなく、遊んで進めるコマンドRPGとして立ち上がるプロトタイプ。
+                テーマを選んで、1問クエストで敵を倒し、EXP とアイテムを拾って進みます。
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {dashboard.themes.map((theme) => (
+                  <button
+                    key={theme.theme_id}
+                    type="button"
+                    onClick={() => selectTheme(theme.theme_id)}
+                    className={
+                      theme.theme_id === activeTheme.theme_id
+                        ? "rounded-full border border-[#f3c57a] bg-[#f3c57a] px-3 py-2 text-xs font-semibold text-[#16222d]"
+                        : "rounded-full border border-[#5f7584] bg-[#101820] px-3 py-2 text-xs font-semibold text-[#f6f0df] transition hover:border-[#f3c57a]"
+                    }
+                  >
+                    {theme.short_name}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => setGameStarted(true)}
+                  className="rounded-full border border-[#f3c57a] bg-[#f3c57a] px-5 py-3 text-sm font-bold text-[#16222d] shadow-lg shadow-[#f3c57a]/20 transition hover:bg-white"
+                >
+                  はじめる
+                </button>
+                <span className="rounded-full border border-[#5f7584] bg-[#101820] px-4 py-3 text-sm font-semibold text-[#d7e0e8]">
+                  {dashboard.engine.name}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {dashboard.themes.map((theme) => (
+                <button
+                  key={theme.theme_id}
+                  type="button"
+                  onClick={() => selectTheme(theme.theme_id)}
+                  className={
+                    theme.theme_id === activeTheme.theme_id
+                      ? "rounded-[22px] border border-[#f3c57a]/50 bg-[#101820] p-4 text-left shadow-[0_0_0_1px_rgba(243,197,122,0.18)]"
+                      : "rounded-[22px] border border-[#5f7584] bg-[#101820] p-4 text-left transition hover:border-[#f3c57a]"
+                  }
+                >
+                  <p className="text-[11px] font-semibold tracking-[0.2em] text-[#8aa0ad] uppercase">{theme.worldview}</p>
+                  <h2 className="mt-2 text-lg font-black text-white">{theme.name}</h2>
+                  <p className="mt-2 text-sm leading-6 text-[#d7e0e8]">{theme.description}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  }
 
   function selectTheme(themeId: string) {
     const theme = dashboard.themes.find((item) => item.theme_id === themeId);
@@ -150,14 +245,18 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
     setActivityMessage(`${stage.title} の戦闘を開始しました。`);
   }
 
-  function performBattleCommand(command: "attack" | "skill" | "guard" | "run") {
+  function submitQuestAnswer(choiceIndex: number) {
     const stage = findStage(activeTheme, battle.stageId);
     if (!stage) return;
 
-    const next = resolveBattleTurn(activeTheme, stage, battle, command, progress);
+    const next = resolveBattleTurn(activeTheme, stage, battle, choiceIndex, progress, hero);
     setBattleStates((current) => ({
       ...current,
       [activeTheme.theme_id]: next.state
+    }));
+    setHeroStates((current) => ({
+      ...current,
+      [activeTheme.theme_id]: next.hero
     }));
     setThemeProgress((current) => ({
       ...current,
@@ -179,7 +278,12 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
               <span>MVP</span>
             </div>
             <div className="space-y-3">
-              <h1 className="text-3xl font-black text-slate-900 md:text-4xl">{dashboard.engine.name}</h1>
+              <div className="flex items-center gap-3">
+                <div className="rounded-full border border-[#d8c5a2] bg-white px-3 py-1 text-[11px] font-semibold tracking-[0.2em] text-[#8a6f4f] uppercase">
+                  PRESS START
+                </div>
+                <h1 className="text-3xl font-black text-slate-900 md:text-4xl">{dashboard.engine.name}</h1>
+              </div>
               <p className="max-w-3xl text-sm leading-7 text-slate-700 md:text-base">{dashboard.engine.summary}</p>
               <p className="max-w-3xl text-sm leading-7 text-slate-600">{dashboard.engine.mvp_note}</p>
             </div>
@@ -193,6 +297,13 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
               <span className="rounded-sm border border-[#d8e5e8] bg-white px-3 py-2 text-sm font-semibold text-[#53766f]">
                 {dashboard.themes.length} themes
               </span>
+              <button
+                type="button"
+                onClick={() => setGameStarted(true)}
+                className="rounded-sm border border-[#f3c57a] bg-[#f3c57a] px-3 py-2 text-sm font-bold text-[#16222d] transition hover:bg-white"
+              >
+                はじめる
+              </button>
             </div>
           </div>
 
@@ -215,7 +326,8 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
             const cleared = countStages(theme, progressItem.stageStatuses, "cleared");
             const total = countStages(theme);
             const progressCount = `${cleared}/${total} cleared`;
-            const exp = theme.player.exp + sumStageExp(theme, progressItem.stageStatuses, "cleared") - sumStageExp(theme, buildDefaultThemeProgress(theme).stageStatuses, "cleared");
+            const themeHero = heroStates[theme.theme_id] ?? buildDefaultHeroState(theme);
+            const exp = themeHero.exp;
 
             return (
               <button
@@ -231,7 +343,7 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
                 <p className="text-sm font-bold text-slate-900">{theme.name}</p>
                 <p className="mt-1 text-xs leading-5 text-slate-500">{theme.short_name}</p>
                 <p className="mt-2 text-[11px] font-semibold tracking-[0.14em] text-slate-500 uppercase">{progressCount}</p>
-                <p className="mt-1 text-xs font-semibold text-[#53766f]">EXP {exp.toLocaleString()}</p>
+                <p className="mt-1 text-xs font-semibold text-[#53766f]">Lv.{themeHero.level} / EXP {exp.toLocaleString()}</p>
               </button>
             );
           })}
@@ -258,15 +370,15 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
             <div className="mt-4 grid gap-3 md:grid-cols-3">
               <div className="rounded-[18px] border border-[#536c57] bg-[#101913] px-3 py-3">
                 <p className="text-[10px] font-semibold tracking-[0.14em] text-[#b7c5b4] uppercase">PLAYER LV</p>
-                <p className="mt-1 text-xl font-black text-white">{activeTheme.player.level}</p>
+                <p className="mt-1 text-xl font-black text-white">{hero.level}</p>
               </div>
               <div className="rounded-[18px] border border-[#536c57] bg-[#101913] px-3 py-3">
                 <p className="text-[10px] font-semibold tracking-[0.14em] text-[#b7c5b4] uppercase">EXP</p>
-                <p className="mt-1 text-xl font-black text-[#8de0b1]">{currentExp.toLocaleString()}</p>
+                <p className="mt-1 text-xl font-black text-[#8de0b1]">{hero.exp.toLocaleString()}</p>
               </div>
               <div className="rounded-[18px] border border-[#536c57] bg-[#101913] px-3 py-3">
                 <p className="text-[10px] font-semibold tracking-[0.14em] text-[#b7c5b4] uppercase">NEXT</p>
-                <p className="mt-1 text-xl font-black text-white">{activeTheme.player.next_level_exp.toLocaleString()}</p>
+                <p className="mt-1 text-xl font-black text-white">{hero.nextLevelExp.toLocaleString()}</p>
               </div>
             </div>
 
@@ -324,15 +436,15 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
                   </div>
                 </div>
                 <div className="mt-4 h-4 overflow-hidden rounded-full bg-[#0c1117]">
-                  <div className="h-full rounded-full bg-[#d83b31]" style={{ width: `${Math.max(0, (battle.enemyHp / battle.enemyMaxHp) * 100)}%` }} />
+                  <div className="h-full rounded-full bg-[#d83b31] transition-all duration-500" style={{ width: `${Math.max(0, (battle.enemyHp / battle.enemyMaxHp) * 100)}%` }} />
                 </div>
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   <BattleStat label="MODE" value={battle.phase === "field" ? "FIELD" : battle.phase === "battle" ? "BATTLE" : "VICTORY"} />
                   <BattleStat label="TARGET" value={selectedStage?.stage_type ?? "unknown"} />
                 </div>
                 <div className="mt-4 rounded-[22px] border border-[#40505c] bg-[#0f1720] px-4 py-4 text-center">
-                  <p className="text-[10px] font-semibold tracking-[0.2em] text-[#8aa0ad] uppercase">BATTLE LOG</p>
-                  <p className="mt-2 text-sm leading-6 text-[#f4eddc]">{battle.log[0] ?? "敵があらわれた。"}</p>
+                  <p className="text-[10px] font-semibold tracking-[0.2em] text-[#8aa0ad] uppercase">QUEST</p>
+                  <p className="mt-2 text-sm leading-6 text-[#f4eddc]">{battle.question.prompt}</p>
                 </div>
               </div>
 
@@ -340,39 +452,50 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
                 <div className="rounded-[20px] border border-[#40505c] bg-[#101820] p-4">
                   <p className="text-[11px] font-semibold tracking-[0.2em] text-[#c8d1d6] uppercase">PLAYER</p>
                   <h4 className="mt-2 text-lg font-black text-white">
-                    Lv.{activeTheme.player.level} {activeTheme.player.title}
+                    Lv.{hero.level} {activeTheme.player.title}
                   </h4>
                   <p className="mt-1 text-sm text-[#c6d1d9]">{activeTheme.description}</p>
                   <p className="mt-3 text-2xl font-black text-[#8de0b1]">{battle.playerHp}</p>
                   <div className="mt-3 h-3 overflow-hidden rounded-full bg-[#0c1117]">
-                    <div className="h-full rounded-full bg-[#2f7f8f]" style={{ width: `${Math.max(0, (battle.playerHp / battle.playerMaxHp) * 100)}%` }} />
+                    <div className="h-full rounded-full bg-[#2f7f8f] transition-all duration-500" style={{ width: `${Math.max(0, (battle.playerHp / battle.playerMaxHp) * 100)}%` }} />
                   </div>
                 </div>
 
                 <div className="rounded-[20px] border border-[#40505c] bg-[#17222d] p-4">
                   <p className="text-[11px] font-semibold tracking-[0.2em] text-[#c8d1d6] uppercase">COMMAND</p>
                   <div className="mt-3 grid grid-cols-2 gap-2">
-                    <BattleCommandButton label="こうげき" onClick={() => performBattleCommand("attack")} disabled={battle.phase === "victory" || !selectedStage} />
-                    <BattleCommandButton label="とくぎ" onClick={() => performBattleCommand("skill")} disabled={battle.phase === "victory" || !selectedStage} />
-                    <BattleCommandButton label="ぼうぎょ" onClick={() => performBattleCommand("guard")} disabled={battle.phase === "victory" || !selectedStage} />
-                    <BattleCommandButton label="にげる" onClick={() => performBattleCommand("run")} disabled={!selectedStage} />
+                    {battle.question.choices.map((choice, choiceIndex) => (
+                      <BattleCommandButton
+                        key={choice}
+                        label={choice}
+                        onClick={() => submitQuestAnswer(choiceIndex)}
+                        disabled={battle.phase === "victory" || !selectedStage}
+                      />
+                    ))}
                   </div>
                   <div className="mt-3 rounded-2xl border border-[#5f7584] bg-[#0f1720] px-3 py-3">
                     <p className="text-[10px] font-semibold tracking-[0.18em] text-[#8aa0ad] uppercase">操作ヒント</p>
-                    <p className="mt-1 text-xs leading-5 text-[#b7c5ce]">フィールドで敵を選ぶと、そのまま戦闘へ入れる。クリアするとステージが進む。</p>
+                    <p className="mt-1 text-xs leading-5 text-[#b7c5ce]">正解で敵HPが減り、EXP とアイテムを獲得。外すと反撃を受ける。</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="rounded-sm border border-[#d8e5e8] bg-[#f7fbfa] p-4">
-              <p className="text-[11px] font-semibold tracking-[0.14em] text-[#53766f]">CURRENT QUEST</p>
-              <h3 className="mt-1 text-2xl font-black text-slate-900">{selectedStage?.title ?? "ステージを選択してください"}</h3>
+            <div className="rounded-[24px] border border-[#d9d0bd] bg-[#fffaf2] p-4 shadow-sm">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-[11px] font-semibold tracking-[0.14em] text-[#8a6f4f]">CURRENT QUEST</p>
+                  <h3 className="mt-1 text-2xl font-black text-slate-900">{selectedStage?.title ?? "ステージを選択してください"}</h3>
+                </div>
+                <span className="rounded-full border border-[#e0c79c] bg-white px-3 py-1 text-xs font-semibold text-[#9a5b1f]">
+                  {battle.result === "correct" ? "勝利" : battle.result === "wrong" ? "要リトライ" : "進行中"}
+                </span>
+              </div>
               <p className="mt-2 text-sm leading-6 text-slate-700">{selectedStage?.summary ?? "ワールドマップから気になるステージを選ぶと、ここに出る。"}</p>
               {selectedStage ? (
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   <InfoTile label="World" value={findWorldTitle(activeTheme, selectedStage.stage_id)} />
-                  <InfoTile label="EXP" value={`+${selectedStage.exp_reward}`} />
+                  <InfoTile label="EXP" value={`+${battle.question.expReward}`} />
                   <InfoTile label="Stage Type" value={selectedStage.stage_type} />
                   <InfoTile label="Device" value={getDeviceLabel(selectedStage.device_requirement)} />
                 </div>
@@ -381,26 +504,42 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
                 <button
                   type="button"
                   onClick={() => selectedStage && enterBattle(selectedStage.stage_id)}
-                  className="rounded-sm border border-[#2f7f8f] bg-[#eef7fb] px-4 py-2 text-sm font-semibold text-[#1f6f91] transition hover:bg-white"
+                  className="rounded-full border border-[#2f7f8f] bg-[#eef7fb] px-4 py-2 text-sm font-semibold text-[#1f6f91] transition hover:bg-white"
                 >
-                  戦闘開始
+                  戦う
                 </button>
                 <button
                   type="button"
                   onClick={() => selectedStage && advanceStage(activeTheme, selectedStage.stage_id, progress, setThemeProgress, setActivityMessage)}
-                  className="rounded-sm border border-[#d6c8b3] bg-[#fbf8f3] px-4 py-2 text-sm font-semibold text-[#8a6f4f] transition hover:bg-white"
+                  className="rounded-full border border-[#d6c8b3] bg-white px-4 py-2 text-sm font-semibold text-[#8a6f4f] transition hover:bg-[#fbf8f3]"
                 >
                   ステージを進める
                 </button>
                 <Link
                   href="/product-lab"
-                  className="rounded-sm border border-[#d6c8b3] bg-white px-4 py-2 text-sm font-semibold text-[#8a6f4f] transition hover:bg-[#fbf8f3]"
+                  className="rounded-full border border-[#d6c8b3] bg-white px-4 py-2 text-sm font-semibold text-[#8a6f4f] transition hover:bg-[#fbf8f3]"
                 >
                   Product Labへ戻る
                 </Link>
               </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-3">
+                <div className="rounded-2xl border border-[#efe2cf] bg-white px-4 py-3">
+                  <p className="text-[10px] font-semibold tracking-[0.14em] text-[#8a6f4f] uppercase">RESULT</p>
+                  <p className={`mt-2 text-sm font-bold ${battle.result === "correct" ? "text-[#2f7a55]" : battle.result === "wrong" ? "text-[#9a3f1f]" : "text-slate-700"}`}>{battle.log[0] ?? "はじめるを押してクエスト開始。"}</p>
+                </div>
+                <div className="rounded-2xl border border-[#efe2cf] bg-white px-4 py-3">
+                  <p className="text-[10px] font-semibold tracking-[0.14em] text-[#8a6f4f] uppercase">LOOT</p>
+                  <p className="mt-2 text-sm font-bold text-slate-900">{battle.lootItem ?? "まだ未入手"}</p>
+                </div>
+                <div className="rounded-2xl border border-[#efe2cf] bg-white px-4 py-3">
+                  <p className="text-[10px] font-semibold tracking-[0.14em] text-[#8a6f4f] uppercase">LEVEL</p>
+                  <p className="mt-2 text-sm font-bold text-slate-900">
+                    Lv.{hero.level} / NEXT {hero.nextLevelExp.toLocaleString()}
+                  </p>
+                </div>
+              </div>
               <p className="mt-3 text-xs leading-5 text-slate-500">
-                {activityMessage} このテーマの進捗はこのブラウザの `localStorage` に保存されます。
+                {activityMessage} このテーマの進行はこのブラウザの `localStorage` に保存されます。
               </p>
             </div>
 
@@ -755,11 +894,76 @@ function mergeBattleMap(dashboard: LearningRpgDashboard, savedBattles?: Record<s
   return merged;
 }
 
+function buildDefaultHeroMap(dashboard: LearningRpgDashboard) {
+  return Object.fromEntries(dashboard.themes.map((theme) => [theme.theme_id, buildDefaultHeroState(theme)])) as Record<string, HeroState>;
+}
+
+function buildDefaultHeroState(theme: LearningRpgTheme): HeroState {
+  const maxHp = 100 + theme.player.level * 8;
+  return {
+    level: theme.player.level,
+    exp: theme.player.exp,
+    nextLevelExp: theme.player.next_level_exp,
+    hp: maxHp,
+    maxHp,
+    items: []
+  };
+}
+
+function mergeHeroMap(dashboard: LearningRpgDashboard, savedHeroes?: Record<string, HeroState>) {
+  const base = buildDefaultHeroMap(dashboard);
+  if (!savedHeroes) return base;
+
+  const merged: Record<string, HeroState> = { ...base };
+  for (const theme of dashboard.themes) {
+    const saved = savedHeroes[theme.theme_id];
+    if (!saved) continue;
+    merged[theme.theme_id] = clampHeroState(saved, theme);
+  }
+
+  return merged;
+}
+
+function clampHeroState(hero: HeroState, theme: LearningRpgTheme): HeroState {
+  const maxHp = 100 + hero.level * 8;
+  return {
+    ...hero,
+    maxHp,
+    hp: Math.max(0, Math.min(hero.hp, maxHp)),
+    items: hero.items.slice(0, 12),
+    nextLevelExp: Math.max(hero.nextLevelExp, theme.player.next_level_exp)
+  };
+}
+
+function gainHeroState(hero: HeroState, expReward: number, lootItem: string) {
+  let level = hero.level;
+  let nextLevelExp = hero.nextLevelExp;
+  let exp = hero.exp + expReward;
+  let leveledUp = false;
+
+  while (exp >= nextLevelExp) {
+    level += 1;
+    nextLevelExp = Math.round(nextLevelExp * 1.2);
+    leveledUp = true;
+  }
+
+  const maxHp = 100 + level * 8;
+  return {
+    level,
+    exp,
+    nextLevelExp,
+    maxHp,
+    hp: leveledUp ? maxHp : Math.min(hero.hp + 8, maxHp),
+    items: [...hero.items, lootItem].slice(-12)
+  };
+}
+
 function buildBattleStateFromStage(theme: LearningRpgTheme, stageId: string, previous?: BattleState): BattleState {
   const stage = findStage(theme, stageId) ?? findFirstStage(theme);
   const enemyMaxHp = Math.max(38, (stage?.exp_reward ?? 20) * 2 + 24);
   const playerMaxHp = 100 + theme.player.level * 8;
   const playerHp = previous?.playerHp && previous.playerHp > 0 ? Math.min(previous.playerHp, playerMaxHp) : playerMaxHp;
+  const question = buildQuestForStage(theme, stage);
 
   return {
     stageId: stage?.stage_id ?? stageId,
@@ -769,6 +973,11 @@ function buildBattleStateFromStage(theme: LearningRpgTheme, stageId: string, pre
     enemyMaxHp,
     playerHp,
     playerMaxHp,
+    question,
+    result: undefined,
+    lootItem: undefined,
+    expGain: undefined,
+    leveledUp: undefined,
     log: stage ? [`${stage.title} に敵が現れた。`] : ["敵が現れた。"]
   };
 }
@@ -780,6 +989,7 @@ function clampBattleState(state: BattleState, stage: LearningRpgStage): BattleSt
     enemyHp: Math.max(0, Math.min(state.enemyHp, enemyMaxHp)),
     enemyMaxHp,
     playerHp: Math.max(0, Math.min(state.playerHp, state.playerMaxHp)),
+    question: state.question,
     log: state.log.slice(0, 4)
   };
 }
@@ -788,8 +998,9 @@ function resolveBattleTurn(
   theme: LearningRpgTheme,
   stage: LearningRpgStage,
   battle: BattleState,
-  command: "attack" | "skill" | "guard" | "run",
-  progress: ThemeProgress
+  choiceIndex: number,
+  progress: ThemeProgress,
+  hero: HeroState
 ) : BattleTurnResult {
   const nextProgress: ThemeProgress = {
     ...progress,
@@ -797,59 +1008,197 @@ function resolveBattleTurn(
     stageStatuses: { ...progress.stageStatuses }
   };
   const nextLog = [...battle.log];
-
-  if (command === "run") {
-    nextLog.unshift("にげだした。");
-    return {
-      state: { ...battle, phase: "field", log: nextLog.slice(0, 4) },
-      progress: nextProgress,
-      message: `${stage.title} からにげた。`
-    };
-  }
+  const correct = choiceIndex === battle.question.answerIndex;
 
   if (battle.phase === "victory") {
     return {
       state: battle,
       progress: nextProgress,
+      hero,
       message: `${stage.title} はクリア済みです。`
     };
   }
 
-  const attackPower = command === "attack" ? 24 + theme.player.level : 36 + theme.player.level;
-  const enemyHp = Math.max(0, battle.enemyHp - attackPower);
-  nextLog.unshift(command === "attack" ? "こうげきした。" : "とくぎをつかった。");
-
-  if (enemyHp <= 0) {
+  if (correct) {
+    const enemyHp = 0;
+    const nextHero = gainHeroState(hero, battle.question.expReward, battle.question.lootItem);
     nextProgress.stageStatuses[stage.stage_id] = "cleared";
+    nextLog.unshift("正解！");
     nextLog.unshift(`${stage.title} をたおした。`);
     return {
       state: {
         ...battle,
         phase: "victory",
-        enemyHp: 0,
+        result: "correct",
+        enemyHp,
+        playerHp: nextHero.hp,
+        lootItem: battle.question.lootItem,
+        expGain: battle.question.expReward,
+        leveledUp: nextHero.level > hero.level,
         log: nextLog.slice(0, 4)
       },
       progress: nextProgress,
-      message: `${stage.title} をクリア！ +${stage.exp_reward} EXP`
+      hero: nextHero,
+      message: nextHero.level > hero.level ? `${stage.title} をクリア！ LEVEL UP! +${battle.question.expReward} EXP` : `${stage.title} をクリア！ +${battle.question.expReward} EXP`
     };
   }
 
-  const guard = command === "guard";
-  const enemyDamage = guard ? 4 : 10 + Math.floor(stage.exp_reward / 10);
-  const playerHp = Math.max(0, battle.playerHp - enemyDamage);
-  nextLog.unshift(guard ? "ぼうぎょした。" : `${battle.enemyName} のこうげき！`);
+  const playerHp = Math.max(0, battle.playerHp - Math.max(6, Math.round(stage.exp_reward / 8)));
+  nextLog.unshift("不正解…");
+  nextLog.unshift(`${battle.enemyName} の反撃！`);
 
   return {
     state: {
       ...battle,
       phase: "battle",
-      enemyHp,
+      result: "wrong",
       playerHp,
+      lootItem: undefined,
+      expGain: 0,
+      leveledUp: false,
       log: nextLog.slice(0, 4)
     },
     progress: nextProgress,
-    message: guard ? "しっかり守った。" : `${battle.enemyName} の攻撃を受けた。`
+    hero: {
+      ...hero,
+      hp: playerHp
+    },
+    message: "ちがう！ もう一度挑戦しよう。"
   };
+}
+
+function buildQuestForStage(theme: LearningRpgTheme, stage?: LearningRpgStage): QuestCard {
+  const fallback: QuestCard = {
+    prompt: "正しい選択肢を選べ。",
+    choices: ["はい", "たぶん", "まだわからない"],
+    answerIndex: 0,
+    expReward: stage?.exp_reward ?? 10,
+    lootItem: "謎の小さな報酬"
+  };
+
+  if (!stage) return fallback;
+
+  if (theme.theme_id === "python_learning_rpg") {
+    if (stage.stage_id.includes("list")) {
+      return {
+        prompt: "順番を持つ複数データをしまう箱はどれ？",
+        choices: ["list", "dict", "def"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "データの袋: list"
+      };
+    }
+    if (stage.stage_id.includes("dict")) {
+      return {
+        prompt: "key と value を対応づける箱はどれ？",
+        choices: ["dict", "tuple", "print"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "キーの辞典: dict"
+      };
+    }
+    if (stage.stage_id.includes("filter")) {
+      return {
+        prompt: "条件でデータを絞る操作はどれ？",
+        choices: ["filter", "sleep", "import"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "俯瞰の鏡: filter"
+      };
+    }
+    if (stage.stage_id.includes("groupby")) {
+      return {
+        prompt: "分類ごとに集計する操作はどれ？",
+        choices: ["groupby", "rename", "plot"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "集計の斧: groupby"
+      };
+    }
+    return {
+      prompt: "小さなアプリを素早く見せる道具はどれ？",
+      choices: ["Streamlit", "pickle", "lambda"],
+      answerIndex: 0,
+      expReward: stage.exp_reward,
+      lootItem: "画面の魔導書: Streamlit"
+    };
+  }
+
+  if (theme.theme_id === "english_learning_rpg") {
+    if (stage.stage_id.includes("daily_words")) {
+      return {
+        prompt: "『hello』にいちばん近い役割はどれ？",
+        choices: ["greeting", "tense", "adverb"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "単語カード"
+      };
+    }
+    if (stage.stage_id.includes("phrase_combo")) {
+      return {
+        prompt: "フレーズを自然につなぐときに大事なのはどれ？",
+        choices: ["word order", "alarm clock", "inventory"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "応答のリボン"
+      };
+    }
+    if (stage.stage_id.includes("tense")) {
+      return {
+        prompt: "未来の予定を話すときに使うのはどれ？",
+        choices: ["future", "past", "noun"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "文法バッジ"
+      };
+    }
+    return {
+      prompt: "会話で相手に返すときに大切なのはどれ？",
+      choices: ["reply", "silence", "spoil"],
+      answerIndex: 0,
+      expReward: stage.exp_reward,
+      lootItem: "会話のコイン"
+    };
+  }
+
+  if (theme.theme_id === "japanese_history_rpg") {
+    if (stage.stage_id.includes("jomon")) {
+      return {
+        prompt: "土器と暮らしで思い浮かぶのはどれ？",
+        choices: ["定住の始まり", "宇宙旅行", "自動運転"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "時の巻物"
+      };
+    }
+    if (stage.stage_id.includes("yayoi")) {
+      return {
+        prompt: "稲作の広がりで大きく変わるのはどれ？",
+        choices: ["集落と社会", "海の深さ", "星の明るさ"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "人物札"
+      };
+    }
+    if (stage.stage_id.includes("kamakura")) {
+      return {
+        prompt: "武士社会の仕組みで近いのはどれ？",
+        choices: ["御恩と奉公", "買い物と配送", "昼寝と散歩"],
+        answerIndex: 0,
+        expReward: stage.exp_reward,
+        lootItem: "法の札"
+      };
+    }
+    return {
+      prompt: "黒船の来航がもたらすものはどれ？",
+      choices: ["外圧と変化", "静かな停滞", "無風状態"],
+      answerIndex: 0,
+      expReward: stage.exp_reward,
+      lootItem: "歴史の羅針盤"
+    };
+  }
+
+  return fallback;
 }
 
 function isStageStatus(value: unknown): value is LearningRpgStage["status"] {
