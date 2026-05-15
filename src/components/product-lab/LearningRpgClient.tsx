@@ -4,171 +4,35 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { LearningRpgDashboard } from "@/lib/learning-rpg";
 
-const STORAGE_KEY = "learning-rpg.classic-loop.v1";
-const TREASURE_CHEST_ID = "forest_chest_001";
-
-type Screen = "title" | "town" | "field" | "battle" | "status";
-type InventoryItem = { itemId: string; count: number };
-type Enemy = {
-  id: string;
-  name: string;
-  hp: number;
-  maxHp: number;
-  attack: number;
-  defense: number;
-  expReward: number;
-  goldReward: number;
-  area: "grassland" | "forest" | "forest_depth";
-  role: "weak" | "normal" | "strong" | "mini_boss";
-};
-
-type Player = {
-  name: string;
-  level: number;
-  hp: number;
-  maxHp: number;
-  mp: number;
-  maxMp: number;
-  attack: number;
-  defense: number;
-  exp: number;
-  gold: number;
-  weaponId: string;
-  armorId: string;
-  items: InventoryItem[];
-};
-
-type Position = { x: number; y: number };
-type GameState = {
-  started: boolean;
-  screen: Screen;
-  player: Player;
-  position: Position;
-  currentEnemy: Enemy | null;
-  log: string[];
-  dialogue: string;
-  steps: number;
-  objectiveCleared: boolean;
-  openedChestIds: string[];
-  miniBossDefeated: boolean;
-};
-
-type Equipment = {
-  id: string;
-  name: string;
-  type: "weapon" | "armor";
-  price: number;
-  attack?: number;
-  defense?: number;
-};
+import {
+  TREASURE_CHEST_ID,
+  addItem,
+  calcDamage,
+  equipment,
+  getAttack,
+  getItemCount,
+  getLocationLabel,
+  getNextLevel,
+  getTile,
+  fieldMap,
+  initialGameState,
+  type GameState,
+  type Screen,
+  isInsideMap,
+  playTone,
+  shouldEncounter,
+  spawnEnemy,
+  spawnMiniBoss,
+  tileClass,
+  tileLabel
+} from "@/lib/learning-rpg-game";
+import { enemyTurn, winBattle } from "@/lib/learning-rpg-battle";
+import { loadGame, saveGame } from "@/lib/learning-rpg-persistence";
+import { BattleScreen, FieldScreen, MessageWindow, StatusBar, StatusScreen, TownScreen } from "@/components/product-lab/LearningRpgScreens";
 
 type LearningRpgClientProps = {
   dashboard: LearningRpgDashboard;
   initialThemeId?: string;
-};
-
-const levelTable = [
-  { level: 1, requiredExp: 0 },
-  { level: 2, requiredExp: 12 },
-  { level: 3, requiredExp: 32 },
-  { level: 4, requiredExp: 65 },
-  { level: 5, requiredExp: 110 }
-];
-
-const equipment: Record<string, Equipment> = {
-  wooden_sword: { id: "wooden_sword", name: "木の短剣", type: "weapon", price: 0, attack: 0 },
-  bronze_sword: { id: "bronze_sword", name: "青銅の剣", type: "weapon", price: 32, attack: 4 },
-  cloth_armor: { id: "cloth_armor", name: "旅人の服", type: "armor", price: 0, defense: 0 },
-  leather_armor: { id: "leather_armor", name: "革のよろい", type: "armor", price: 28, defense: 3 }
-};
-
-const enemies: Enemy[] = [
-  {
-    id: "soft_blob",
-    name: "ぷるぷる",
-    hp: 10,
-    maxHp: 10,
-    attack: 4,
-    defense: 1,
-    expReward: 4,
-    goldReward: 6,
-    area: "grassland",
-    role: "weak"
-  },
-  {
-    id: "night_bat",
-    name: "よるこうもり",
-    hp: 16,
-    maxHp: 16,
-    attack: 6,
-    defense: 2,
-    expReward: 7,
-    goldReward: 10,
-    area: "grassland",
-    role: "normal"
-  },
-  {
-    id: "wild_boar",
-    name: "あばれイノシシ",
-    hp: 26,
-    maxHp: 26,
-    attack: 9,
-    defense: 3,
-    expReward: 12,
-    goldReward: 18,
-    area: "forest",
-    role: "strong"
-  },
-  {
-    id: "forest_guardian",
-    name: "森のぬし",
-    hp: 45,
-    maxHp: 45,
-    attack: 10,
-    defense: 4,
-    expReward: 25,
-    goldReward: 40,
-    area: "forest_depth",
-    role: "mini_boss"
-  }
-];
-
-const fieldMap: string[][] = [
-  ["water", "grass", "grass", "forest", "boss"],
-  ["town", "road", "grass", "forest", "forest"],
-  ["water", "road", "chest", "grass", "hill"],
-  ["water", "grass", "forest", "road", "hill"],
-  ["shore", "grass", "grass", "road", "water"]
-];
-
-const initialPlayer: Player = {
-  name: "Hero",
-  level: 1,
-  hp: 24,
-  maxHp: 24,
-  mp: 6,
-  maxMp: 6,
-  attack: 7,
-  defense: 4,
-  exp: 0,
-  gold: 30,
-  weaponId: "wooden_sword",
-  armorId: "cloth_armor",
-  items: [{ itemId: "herb", count: 2 }]
-};
-
-const initialGameState: GameState = {
-  started: false,
-  screen: "title",
-  player: initialPlayer,
-  position: { x: 1, y: 1 },
-  currentEnemy: null,
-  log: ["旅の準備ができた。"],
-  dialogue: "町の人に話しかけて、北の森へ向かう目的を聞こう。",
-  steps: 0,
-  objectiveCleared: false,
-  openedChestIds: [],
-  miniBossDefeated: false
 };
 
 export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
@@ -179,6 +43,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
   const defense = player.defense + (equipment[player.armorId]?.defense ?? 0);
   const nextLevel = getNextLevel(player.level);
   const herbCount = getItemCount(player, "herb");
+  const location = getLocationLabel(game);
 
   useEffect(() => {
     const saved = loadGame();
@@ -190,7 +55,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
 
   useEffect(() => {
     if (game.started) {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(game));
+      saveGame(game);
       setHasSave(true);
     }
   }, [game]);
@@ -206,7 +71,13 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
 
   function continueGame() {
     const saved = loadGame();
-    if (saved) setGame({ ...saved, screen: saved.screen === "title" ? "town" : saved.screen });
+    if (saved) {
+      setGame({
+        ...saved,
+        started: true,
+        screen: saved.screen
+      });
+    }
   }
 
   function setScreen(screen: Screen) {
@@ -499,7 +370,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
     <main className="min-h-screen rounded-[6px] border border-[#243341] bg-[#0d1118] text-[#f6f0df] shadow-[0_28px_90px_rgba(12,17,24,0.35)]">
       <div className="grid gap-4 p-3 md:p-5 xl:grid-cols-[1fr_320px]">
         <section className="grid gap-4">
-          <StatusBar player={player} attack={attack} defense={defense} nextExp={nextLevel?.requiredExp ?? player.exp} />
+          <StatusBar player={player} attack={attack} defense={defense} nextExp={nextLevel?.requiredExp ?? player.exp} location={location} />
           {game.screen === "town" ? (
             <TownScreen game={game} onNpc={talkToNpc} onRest={restAtInn} onBuy={buyEquipment} onField={() => setScreen("field")} onStatus={() => setScreen("status")} />
           ) : null}
@@ -532,278 +403,6 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
   );
 }
 
-function TownScreen({
-  game,
-  onNpc,
-  onRest,
-  onBuy,
-  onField,
-  onStatus
-}: {
-  game: GameState;
-  onNpc: (kind: "goal" | "heal" | "shop" | "boss" | "world") => void;
-  onRest: () => void;
-  onBuy: (itemId: "bronze_sword" | "leather_armor") => void;
-  onField: () => void;
-  onStatus: () => void;
-}) {
-  return (
-    <GamePanel title="はじまりの町" subtitle="安全な拠点">
-      <div className="grid gap-4">
-        <div className="grid min-h-[260px] grid-cols-5 grid-rows-4 overflow-hidden rounded-[6px] border border-[#394b39]">
-          {Array.from({ length: 20 }).map((_, index) => {
-            const labels: Record<number, string> = { 2: "宿", 6: "店", 9: "人", 12: "人", 14: "人", 16: "出口", 18: "人" };
-            return (
-              <button key={index} type="button" onClick={() => handleTownTile(index, onNpc, onRest, onField)} className={`border border-black/20 text-sm font-black ${index === 2 || index === 6 ? "bg-[#7c5f3e]" : index === 16 ? "bg-[#d8c48d] text-[#16222d]" : labels[index] ? "bg-[#617c67]" : "bg-[#91bd74]"}`}>
-                {labels[index] ?? ""}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <CommandButton label="町長と話す" detail="目的地を聞く" onClick={() => onNpc("goal")} />
-          <CommandButton label="旅人と話す" detail="回復のヒント" onClick={() => onNpc("heal")} />
-          <CommandButton label="店主と話す" detail="装備のヒント" onClick={() => onNpc("shop")} />
-          <CommandButton label="見張りと話す" detail="森の奥の警告" onClick={() => onNpc("boss")} />
-          <CommandButton label="町人と話す" detail="世界観を聞く" onClick={() => onNpc("world")} />
-          <CommandButton label="宿屋" detail="HP/MP全回復" onClick={onRest} />
-          <CommandButton label="ステータス" detail="強さを見る" onClick={onStatus} />
-        </div>
-
-        <div className="grid gap-3 md:grid-cols-2">
-          <ShopButton item={equipment.bronze_sword} currentId={game.player.weaponId} gold={game.player.gold} onBuy={() => onBuy("bronze_sword")} />
-          <ShopButton item={equipment.leather_armor} currentId={game.player.armorId} gold={game.player.gold} onBuy={() => onBuy("leather_armor")} />
-        </div>
-
-        <button type="button" onClick={onField} className="rounded-[6px] border border-[#f3c57a] bg-[#f3c57a] px-4 py-4 text-left font-black text-[#16222d] transition hover:bg-white">
-          フィールドへ出る
-        </button>
-      </div>
-    </GamePanel>
-  );
-}
-
-function FieldScreen({
-  game,
-  onMove,
-  onTown,
-  onSeek,
-  onStatus
-}: {
-  game: GameState;
-  onMove: (direction: "up" | "down" | "left" | "right") => void;
-  onTown: () => void;
-  onSeek: () => void;
-  onStatus: () => void;
-}) {
-  return (
-    <GamePanel title="北のフィールド" subtitle="探索">
-      <div className="grid gap-4 xl:grid-cols-[1fr_220px]">
-        <div className="grid aspect-square grid-cols-5 grid-rows-5 overflow-hidden rounded-[6px] border border-[#394b39]">
-          {fieldMap.flatMap((row, y) =>
-            row.map((tile, x) => {
-              const playerHere = game.position.x === x && game.position.y === y;
-              return (
-                <div key={`${x}-${y}`} className={`relative border border-black/20 ${tileClass(tile)}`}>
-                  {playerHere ? <div className="absolute inset-2 grid place-items-center rounded-[4px] border border-[#f3c57a] bg-[#101820] text-sm font-black text-[#f3c57a]">勇</div> : null}
-                  {!playerHere && tile === "town" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-[#16222d]">町</span> : null}
-                  {!playerHere && tile === "chest" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-[#16222d]">{game.openedChestIds.includes(TREASURE_CHEST_ID) ? "空" : "宝"}</span> : null}
-                  {!playerHere && tile === "boss" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-white">{game.miniBossDefeated ? "光" : "主"}</span> : null}
-                  {!playerHere && tile === "goal" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-white">光</span> : null}
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <div className="grid gap-3 content-start">
-          <div className="grid grid-cols-3 gap-2">
-            <span />
-            <CommandButton label="↑" detail="北" onClick={() => onMove("up")} />
-            <span />
-            <CommandButton label="←" detail="西" onClick={() => onMove("left")} />
-            <CommandButton label="↓" detail="南" onClick={() => onMove("down")} />
-            <CommandButton label="→" detail="東" onClick={() => onMove("right")} />
-          </div>
-          <CommandButton label="敵を探す" detail="その場で遭遇" onClick={onSeek} />
-          <CommandButton label="町に戻る" detail="回復と準備" onClick={onTown} />
-          <CommandButton label="ステータス" detail="強さを見る" onClick={onStatus} />
-        </div>
-      </div>
-    </GamePanel>
-  );
-}
-
-function BattleScreen({
-  enemy,
-  player,
-  herbCount,
-  onAttack,
-  onFire,
-  onHeal,
-  onHerb,
-  onFlee
-}: {
-  enemy: Enemy | null;
-  player: Player;
-  herbCount: number;
-  onAttack: () => void;
-  onFire: () => void;
-  onHeal: () => void;
-  onHerb: () => void;
-  onFlee: () => void;
-}) {
-  if (!enemy) return null;
-  return (
-    <GamePanel title="戦闘" subtitle={`${enemy.name}があらわれた`}>
-      <div className="grid gap-4">
-        <div className="grid gap-3 md:grid-cols-2">
-          <FighterWindow name={player.name} hp={player.hp} maxHp={player.maxHp} mp={player.mp} maxMp={player.maxMp} />
-          <FighterWindow name={enemy.name} hp={enemy.hp} maxHp={enemy.maxHp} />
-        </div>
-        <div className="grid min-h-[180px] place-items-center rounded-[6px] border border-[#40505c] bg-[radial-gradient(circle_at_top,#334a58_0%,#17222d_48%,#101820_100%)]">
-          <div className="grid h-24 w-28 place-items-center rounded-[6px] border border-[#7c5f5f] bg-[#2a1c1c] text-center text-sm font-black text-[#f4eddc] shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
-            {enemy.name}
-          </div>
-        </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <CommandButton label="たたかう" detail="通常攻撃" onClick={onAttack} />
-          <CommandButton label="火の玉" detail="MP 3 / 強攻撃" onClick={onFire} disabled={player.mp < 3} />
-          <CommandButton label="小回復" detail="MP 3 / HP回復" onClick={onHeal} disabled={player.mp < 3} />
-          <CommandButton label={`薬草 ${herbCount}`} detail="HP回復" onClick={onHerb} disabled={herbCount <= 0} />
-          <CommandButton label="にげる" detail={enemy.role === "mini_boss" ? "小ボス戦は不可" : "成功率70%"} onClick={onFlee} />
-        </div>
-      </div>
-    </GamePanel>
-  );
-}
-
-function StatusScreen({ player, attack, defense, onBack }: { player: Player; attack: number; defense: number; onBack: () => void }) {
-  const next = getNextLevel(player.level);
-  return (
-    <GamePanel title="ステータス" subtitle="現在の強さ">
-      <div className="grid gap-3 md:grid-cols-2">
-        <Info label="名前" value={player.name} />
-        <Info label="レベル" value={String(player.level)} />
-        <Info label="HP" value={`${player.hp}/${player.maxHp}`} />
-        <Info label="MP" value={`${player.mp}/${player.maxMp}`} />
-        <Info label="攻撃力" value={String(attack)} />
-        <Info label="防御力" value={String(defense)} />
-        <Info label="経験値" value={String(player.exp)} />
-        <Info label="次のレベル" value={next ? `${Math.max(0, next.requiredExp - player.exp)} EXP` : "MAX"} />
-        <Info label="ゴールド" value={String(player.gold)} />
-        <Info label="武器" value={equipment[player.weaponId].name} />
-        <Info label="防具" value={equipment[player.armorId].name} />
-      </div>
-      <button type="button" onClick={onBack} className="mt-4 rounded-[6px] border border-[#f3c57a] bg-[#f3c57a] px-4 py-3 text-left font-black text-[#16222d] transition hover:bg-white">
-        戻る
-      </button>
-    </GamePanel>
-  );
-}
-
-function StatusBar({ player, attack, defense, nextExp }: { player: Player; attack: number; defense: number; nextExp: number }) {
-  return (
-    <section className="grid gap-2 rounded-[6px] border border-[#40505c] bg-[#101820] p-3 md:grid-cols-4">
-      <Info label="Hero" value={`Lv.${player.level}`} dark />
-      <Info label="HP / MP" value={`${player.hp}/${player.maxHp}  ${player.mp}/${player.maxMp}`} dark />
-      <Info label="ATK / DEF" value={`${attack} / ${defense}`} dark />
-      <Info label="GOLD / NEXT" value={`${player.gold} / ${Math.max(0, nextExp - player.exp)}`} dark />
-    </section>
-  );
-}
-
-function GamePanel({ title, subtitle, children }: { title: string; subtitle: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-[6px] border border-[#40505c] bg-[linear-gradient(180deg,#17222d_0%,#101820_100%)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
-      <div className="mb-4">
-        <p className="text-xs font-bold tracking-[0.18em] text-[#c8d1d6] uppercase">{title}</p>
-        <h2 className="mt-1 text-xl font-black text-white">{subtitle}</h2>
-      </div>
-      {children}
-    </section>
-  );
-}
-
-function MessageWindow({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <section className="rounded-[6px] border border-[#40505c] bg-[#101820] p-4 text-sm leading-6 text-[#d7e0e8]">
-      <p className="mb-2 text-xs font-bold tracking-[0.18em] text-[#8aa0ad] uppercase">{title}</p>
-      {children}
-    </section>
-  );
-}
-
-function CommandButton({ label, detail, onClick, disabled }: { label: string; detail: string; onClick: () => void; disabled?: boolean }) {
-  return (
-    <button type="button" onClick={onClick} disabled={disabled} className="rounded-[6px] border border-[#5f7584] bg-[#101820] px-4 py-3 text-left text-sm font-bold text-[#f4eddc] transition hover:border-[#f3c57a] disabled:cursor-not-allowed disabled:opacity-40">
-      <span className="block text-base text-white">{label}</span>
-      <span className="mt-1 block text-xs font-semibold text-[#b7c5ce]">{detail}</span>
-    </button>
-  );
-}
-
-function ShopButton({ item, currentId, gold, onBuy }: { item: Equipment; currentId: string; gold: number; onBuy: () => void }) {
-  const owned = currentId === item.id;
-  return (
-    <button type="button" onClick={onBuy} disabled={owned || gold < item.price} className="rounded-[6px] border border-[#5f7584] bg-[#101820] px-4 py-3 text-left text-sm font-bold text-[#f4eddc] transition hover:border-[#f3c57a] disabled:cursor-not-allowed disabled:opacity-55">
-      <span className="block text-base text-white">{item.name}</span>
-      <span className="mt-1 block text-xs font-semibold text-[#b7c5ce]">{owned ? "装備中" : `${item.price} GOLD`}</span>
-    </button>
-  );
-}
-
-function FighterWindow({ name, hp, maxHp, mp, maxMp }: { name: string; hp: number; maxHp: number; mp?: number; maxMp?: number }) {
-  return (
-    <div className="rounded-[6px] border border-[#40505c] bg-[#101820] p-4">
-      <div className="flex items-center justify-between gap-3">
-        <p className="font-black text-white">{name}</p>
-        <p className="text-sm font-bold text-[#f3c57a]">HP {hp}/{maxHp}</p>
-      </div>
-      <div className="mt-3 h-3 overflow-hidden rounded-full bg-[#0d1118]">
-        <div className="h-full bg-[#d83b31] transition-all" style={{ width: `${Math.max(0, (hp / maxHp) * 100)}%` }} />
-      </div>
-      {typeof mp === "number" && typeof maxMp === "number" ? (
-        <p className="mt-2 text-sm font-bold text-[#8de0b1]">MP {mp}/{maxMp}</p>
-      ) : null}
-    </div>
-  );
-}
-
-function Info({ label, value, dark }: { label: string; value: string; dark?: boolean }) {
-  return (
-    <div className={`rounded-[6px] border px-3 py-3 ${dark ? "border-[#40505c] bg-[#0d1118]" : "border-[#40505c] bg-[#101820]"}`}>
-      <p className="text-xs font-bold tracking-[0.12em] text-[#8aa0ad] uppercase">{label}</p>
-      <p className="mt-1 text-sm font-black text-white">{value}</p>
-    </div>
-  );
-}
-
-function loadGame() {
-  if (typeof window === "undefined") return null;
-  try {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = JSON.parse(raw) as GameState;
-    if (!parsed?.player) return null;
-    return {
-      ...initialGameState,
-      ...parsed,
-      player: {
-        ...initialPlayer,
-        ...parsed.player,
-        items: parsed.player.items ?? initialPlayer.items
-      },
-      openedChestIds: parsed.openedChestIds ?? [],
-      miniBossDefeated: Boolean(parsed.miniBossDefeated),
-      objectiveCleared: Boolean(parsed.miniBossDefeated)
-    };
-  } catch {
-    return null;
-  }
-}
-
 function handleTownTile(index: number, onNpc: (kind: "goal" | "heal" | "shop" | "boss" | "world") => void, onRest: () => void, onField: () => void) {
   if (index === 2) onRest();
   if (index === 6) onNpc("shop");
@@ -812,189 +411,4 @@ function handleTownTile(index: number, onNpc: (kind: "goal" | "heal" | "shop" | 
   if (index === 14) onNpc("boss");
   if (index === 16) onField();
   if (index === 18) onNpc("world");
-}
-
-function getItemCount(player: Player, itemId: string) {
-  return player.items.find((item) => item.itemId === itemId)?.count ?? 0;
-}
-
-function addItem(player: Player, itemId: string, count: number): Player {
-  const exists = player.items.some((item) => item.itemId === itemId);
-  return {
-    ...player,
-    items: exists ? player.items.map((item) => (item.itemId === itemId ? { ...item, count: item.count + count } : item)) : [...player.items, { itemId, count }]
-  };
-}
-
-function getAttack(player: Player) {
-  return player.attack + (equipment[player.weaponId]?.attack ?? 0);
-}
-
-function getDefense(player: Player) {
-  return player.defense + (equipment[player.armorId]?.defense ?? 0);
-}
-
-function calcDamage(attackerAttack: number, defenderDefense: number) {
-  return Math.max(1, attackerAttack - defenderDefense + Math.floor(Math.random() * 5) - 2);
-}
-
-function enemyTurn(game: GameState, logs: string[]) {
-  if (!game.currentEnemy) return game;
-  const damage = calcDamage(game.currentEnemy.attack, getDefense(game.player));
-  const hp = Math.max(0, game.player.hp - damage);
-  if (hp <= 0) {
-    return {
-      ...game,
-      screen: "town" as Screen,
-      currentEnemy: null,
-      player: { ...game.player, hp: Math.max(1, Math.floor(game.player.maxHp / 2)) },
-      dialogue: "目を覚ますと町に戻っていた。宿屋で体勢を立て直そう。",
-      log: [...logs, `${game.currentEnemy.name}のこうげき！`, `${game.player.name}は${damage}のダメージをうけた！`, "目を覚ますと町に戻っていた。", ...game.log].slice(0, 8)
-    };
-  }
-
-  return {
-    ...game,
-    player: { ...game.player, hp },
-    log: [...logs, `${game.currentEnemy.name}のこうげき！`, `${game.player.name}は${damage}のダメージをうけた！`, ...game.log].slice(0, 8)
-  };
-}
-
-function winBattle(game: GameState, logs: string[]) {
-  if (!game.currentEnemy) return game;
-  const enemy = game.currentEnemy;
-  const gainedExp = game.player.exp + enemy.expReward;
-  const beforeLevel = game.player.level;
-  const leveledPlayer = applyLevelUps({ ...game.player, exp: gainedExp, gold: game.player.gold + enemy.goldReward });
-  const levelLog = leveledPlayer.level > beforeLevel ? [`レベルが${leveledPlayer.level}に上がった！`] : [];
-  const miniBossWon = enemy.role === "mini_boss";
-  playTone(miniBossWon ? "boss" : levelLog.length ? "level" : "victory");
-
-  return {
-    ...game,
-    screen: "field" as Screen,
-    currentEnemy: null,
-    player: leveledPlayer,
-    objectiveCleared: miniBossWon ? true : game.objectiveCleared,
-    miniBossDefeated: miniBossWon ? true : game.miniBossDefeated,
-    dialogue: miniBossWon ? "森のぬしをたおした。北の森の光は、静かに消えていった。" : "戦いに勝った。町に戻るか、もう少し先へ進むか選べる。",
-    log: [
-      ...logs,
-      `${enemy.name}をたおした！`,
-      `経験値${enemy.expReward}を手に入れた！`,
-      `${enemy.goldReward}ゴールドを手に入れた！`,
-      ...levelLog,
-      ...(miniBossWon ? ["北の森の光は、静かに消えていった。", "小さな冒険者として、一歩を踏み出した。"] : []),
-      ...game.log
-    ].slice(0, 8)
-  };
-}
-
-function applyLevelUps(player: Player) {
-  let nextPlayer = { ...player };
-  for (const entry of levelTable) {
-    if (entry.level > nextPlayer.level && nextPlayer.exp >= entry.requiredExp) {
-      nextPlayer = {
-        ...nextPlayer,
-        level: entry.level,
-        maxHp: nextPlayer.maxHp + 7,
-        maxMp: nextPlayer.maxMp + 3,
-        attack: nextPlayer.attack + 2,
-        defense: nextPlayer.defense + 1
-      };
-      nextPlayer.hp = nextPlayer.maxHp;
-      nextPlayer.mp = nextPlayer.maxMp;
-    }
-  }
-  return nextPlayer;
-}
-
-function getNextLevel(level: number) {
-  return levelTable.find((entry) => entry.level > level);
-}
-
-function isInsideMap(position: Position) {
-  return position.y >= 0 && position.y < fieldMap.length && position.x >= 0 && position.x < fieldMap[0].length;
-}
-
-function getTile(position: Position) {
-  return fieldMap[position.y][position.x];
-}
-
-function shouldEncounter(tile: string, steps: number) {
-  if (tile === "forest") return steps % 2 === 0;
-  if (tile === "grass" || tile === "hill" || tile === "road") return steps % 3 === 0;
-  return false;
-}
-
-function spawnEnemy(tile: string): Enemy {
-  const pool = tile === "forest" ? enemies.filter((enemy) => enemy.area === "forest") : enemies.filter((enemy) => enemy.area === "grassland");
-  const base = pool[Math.floor(Math.random() * pool.length)] ?? enemies[0];
-  return { ...base, hp: base.maxHp };
-}
-
-function spawnMiniBoss(): Enemy {
-  const base = enemies.find((enemy) => enemy.role === "mini_boss") ?? enemies[0];
-  return { ...base, hp: base.maxHp };
-}
-
-function tileLabel(tile: string) {
-  const labels: Record<string, string> = {
-    grass: "草原",
-    forest: "森",
-    chest: "宝箱",
-    boss: "森の奥",
-    hill: "丘",
-    road: "街道",
-    shore: "水辺"
-  };
-  return labels[tile] ?? tile;
-}
-
-function tileClass(tile: string) {
-  const classes: Record<string, string> = {
-    water: "bg-[#6da1c9]",
-    shore: "bg-[#b8d6c6]",
-    grass: "bg-[#91bd74]",
-    road: "bg-[#d8c48d]",
-    forest: "bg-[#3f6f4f]",
-    chest: "bg-[#d8c48d]",
-    boss: "bg-[#7c5f8f]",
-    hill: "bg-[#88aa63]",
-    goal: "bg-[#7c5f8f]",
-    town: "bg-[#d8c48d]"
-  };
-  return classes[tile] ?? "bg-[#91bd74]";
-}
-
-function playTone(kind: "victory" | "level" | "treasure" | "boss") {
-  if (typeof window === "undefined") return;
-  const AudioContextClass = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextClass) return;
-
-  try {
-    const audio = new AudioContextClass();
-    const now = audio.currentTime;
-    const sequence = {
-      victory: [523, 659, 784],
-      level: [659, 784, 988],
-      treasure: [784, 988],
-      boss: [392, 523, 659, 1046]
-    }[kind];
-
-    sequence.forEach((frequency, index) => {
-      const oscillator = audio.createOscillator();
-      const gain = audio.createGain();
-      oscillator.type = "square";
-      oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime(0.04, now + index * 0.09);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.09 + 0.08);
-      oscillator.connect(gain);
-      gain.connect(audio.destination);
-      oscillator.start(now + index * 0.09);
-      oscillator.stop(now + index * 0.09 + 0.08);
-    });
-  } catch {
-    // Audio is optional; logs and screen state still carry the result.
-  }
 }
