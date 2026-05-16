@@ -245,6 +245,23 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
       }
 
       const tile = getTile(currentFieldId, nextPosition);
+      if (tile === "blocked") {
+        return {
+          ...current,
+          dialogue: field.learningGateNote ?? "ここはまだ通れない。何かを理解すれば道が開きそうだ。",
+          log: [field.learningGateNote ?? "ここはまだ通れない。", ...current.log].slice(0, 8)
+        };
+      }
+
+      if (tile === "landmark") {
+        return {
+          ...current,
+          position: nextPosition,
+          dialogue: field.learningGateNote ?? "古い石碑がある。後で学びの問いに使えそうだ。",
+          log: ["古い石碑を見つけた。", field.learningGateNote ?? "ここは学びの入口になりそうだ。", ...current.log].slice(0, 8)
+        };
+      }
+
       if (tile === "water") {
         return { ...current, log: ["水辺が行く手をふさいでいる。", ...current.log].slice(0, 8) };
       }
@@ -265,14 +282,10 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
 
       if (tile === "goal") {
         if (!current.miniBossDefeated) {
-          const enemy = spawnMiniBoss();
           return {
             ...current,
-            screen: "battle",
-            position: nextPosition,
-            currentEnemy: enemy,
-            dialogue: "森の奥の光で、森のぬしが立ちはだかった。",
-            log: ["森の奥の光が揺れた。", `${enemy.name} があらわれた！`, ...current.log].slice(0, 8)
+            dialogue: "森の奥の光はまだ不安定だ。先へ進むには、まず森のぬしを越える必要がある。",
+            log: ["森の奥の光はまだ不安定だ。", "先へ進むには、まず森のぬしを越える必要がある。", ...current.log].slice(0, 8)
           };
         }
         return {
@@ -352,13 +365,14 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
     setGame((current) => {
       const fieldId = current.fieldId ?? current.currentFieldId ?? initialGameState.fieldId;
       const tile = getTile(fieldId, current.position);
-      if (tile === "goal" && current.miniBossDefeated) {
+      if (tile === "goal" && !current.miniBossDefeated) {
         return {
           ...current,
-          log: ["ここにはもう強い気配はない。", ...current.log].slice(0, 8)
+          log: ["森の奥の光はまだ不安定だ。", ...current.log].slice(0, 8),
+          dialogue: "まず森のぬしを倒してから、光の場所へ向かおう。"
         };
       }
-      const enemy = tile === "goal" ? spawnMiniBoss() : spawnEnemy(fieldId, tile);
+      const enemy = tile === "goal" || tile === "boss" ? spawnMiniBoss() : spawnEnemy(fieldId, tile);
       return {
         ...current,
         screen: "battle",

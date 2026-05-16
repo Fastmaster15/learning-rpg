@@ -124,11 +124,15 @@ export function FieldScreen({
                         ? game.miniBossDefeated
                           ? "静"
                           : "主"
-                        : tile === "goal"
-                          ? "光"
-                          : tile === "gate"
-                            ? transition?.label ?? "門"
-                            : "";
+                      : tile === "goal"
+                        ? "光"
+                      : tile === "blocked"
+                        ? "封"
+                      : tile === "landmark"
+                        ? "碑"
+                      : tile === "gate"
+                        ? transition?.label ?? "門"
+                        : "";
 
                 return (
                   <div key={`${x}-${y}`} className={`relative border border-black/20 ${tileClass(tile)}`}>
@@ -148,6 +152,7 @@ export function FieldScreen({
               <Info label="FIELD ID" value={field.fieldId} dark />
               <Info label="SIZE" value={`${field.width} × ${field.height}`} dark />
               <Info label="GOAL" value={field.description} dark />
+              {field.learningGateNote ? <Info label="GATE NOTE" value={field.learningGateNote} dark /> : null}
             </div>
           </div>
           <div className="grid grid-cols-3 gap-2">

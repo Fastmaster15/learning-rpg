@@ -45,7 +45,20 @@ export type Equipment = {
   defense?: number;
 };
 
-export type FieldTile = "water" | "shore" | "grass" | "road" | "forest" | "chest" | "boss" | "hill" | "goal" | "town" | "gate";
+export type FieldTile =
+  | "water"
+  | "shore"
+  | "grass"
+  | "road"
+  | "forest"
+  | "chest"
+  | "boss"
+  | "hill"
+  | "goal"
+  | "town"
+  | "gate"
+  | "blocked"
+  | "landmark";
 export type FieldTransition = {
   toFieldId: FieldId;
   toPosition: Position;
@@ -57,6 +70,7 @@ export type FieldDefinition = {
   name: string;
   townName: string;
   description: string;
+  learningGateNote?: string;
   width: number;
   height: number;
   encounterArea: "safe" | "grassland" | "forest" | "forest_depth";
@@ -282,6 +296,7 @@ export const fields: Record<FieldId, FieldDefinition> = {
     name: "草原街道",
     townName: "はじまりの町",
     description: "見えているから進みたくなる街道。宝箱や曲がり道があり、先に森の入口が見える。",
+    learningGateNote: "街道の石碑は、まだ意味がつかめない。後で学びが進むと、この道の先の意味が分かりそうだ。",
     width: FIELD_WIDTH,
     height: FIELD_HEIGHT,
     encounterArea: "grassland",
@@ -368,7 +383,7 @@ export const fields: Record<FieldId, FieldDefinition> = {
       { x: 6, y: 6, tile: "grass" },
       { x: 7, y: 6, tile: "grass" },
       { x: 8, y: 6, tile: "grass" },
-      { x: 9, y: 6, tile: "forest" },
+      { x: 9, y: 6, tile: "landmark" },
       { x: 10, y: 6, tile: "forest" },
       { x: 11, y: 6, tile: "road" },
       { x: 12, y: 6, tile: "forest" },
@@ -436,6 +451,7 @@ export const fields: Record<FieldId, FieldDefinition> = {
     name: "森の入口",
     townName: "はじまりの町",
     description: "木々が濃くなり、少し先は見えるのに気になる。まだ通れない知識の門と、奥へ続く道の予感がある。",
+    learningGateNote: "森の入口には古い石碑と、まだ通れない脇道がある。理解が進めば先へ行けそうだ。",
     width: FIELD_WIDTH,
     height: FIELD_HEIGHT,
     encounterArea: "forest",
@@ -486,7 +502,7 @@ export const fields: Record<FieldId, FieldDefinition> = {
       { x: 8, y: 3, tile: "forest" },
       { x: 12, y: 3, tile: "forest" },
       { x: 13, y: 3, tile: "forest" },
-      { x: 14, y: 3, tile: "forest" },
+      { x: 14, y: 3, tile: "blocked" },
       { x: 15, y: 3, tile: "forest" },
       { x: 0, y: 4, tile: "grass" },
       { x: 1, y: 4, tile: "grass" },
@@ -617,6 +633,7 @@ export const fields: Record<FieldId, FieldDefinition> = {
     name: "森の深部",
     townName: "はじまりの町",
     description: "最深部の張りつめた空気。学ぶと道が開く、知識の門の先に章の終点がある。",
+    learningGateNote: "森の深部では、光の前に意味の分からない門がある。今はまだ通れない。",
     width: FIELD_WIDTH,
     height: FIELD_HEIGHT,
     encounterArea: "forest_depth",
@@ -730,7 +747,7 @@ export const fields: Record<FieldId, FieldDefinition> = {
       { x: 9, y: 8, tile: "road" },
       { x: 10, y: 8, tile: "road" },
       { x: 11, y: 8, tile: "road" },
-      { x: 12, y: 8, tile: "road" },
+      { x: 12, y: 8, tile: "boss" },
       { x: 13, y: 8, tile: "goal" },
       { x: 14, y: 8, tile: "grass" },
       { x: 15, y: 8, tile: "grass" },
@@ -892,7 +909,7 @@ export function getFieldTransition(fieldId: FieldId, position: Position) {
 
 export function shouldEncounter(fieldId: FieldId, tile: FieldTile, steps: number, roll = Math.random()) {
   const field = getField(fieldId);
-  if (field.encounterArea === "safe" || tile === "water" || tile === "town" || tile === "gate" || tile === "chest" || tile === "goal" || tile === "boss") return false;
+  if (field.encounterArea === "safe" || tile === "water" || tile === "town" || tile === "gate" || tile === "chest" || tile === "goal" || tile === "boss" || tile === "blocked" || tile === "landmark") return false;
   if (steps < 2) return false;
 
   const chance =
@@ -947,7 +964,9 @@ export function tileLabel(tile: FieldTile) {
     hill: "丘",
     goal: "光",
     town: "町",
-    gate: "門"
+    gate: "門",
+    blocked: "封",
+    landmark: "碑"
   };
   return labels[tile] ?? tile;
 }
@@ -964,7 +983,9 @@ export function tileClass(tile: FieldTile) {
     hill: "bg-[#88aa63]",
     goal: "bg-[#7c5f8f]",
     town: "bg-[#d8c48d]",
-    gate: "bg-[#c59c55]"
+    gate: "bg-[#c59c55]",
+    blocked: "bg-[#6f7882]",
+    landmark: "bg-[#8a8f96]"
   };
   return classes[tile] ?? "bg-[#91bd74]";
 }
@@ -996,7 +1017,9 @@ export function getLocationLabel(game: GameState) {
     shore: "水辺",
     water: "水辺",
     goal: "光の場所",
-    gate: field.name
+    gate: field.name,
+    blocked: "通れない道",
+    landmark: "古い石碑"
   };
   return labels[tile] ?? field.name;
 }
