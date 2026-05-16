@@ -5,15 +5,17 @@ import {
   TREASURE_CHEST_ID,
   equipment,
   getFieldTransition,
+  getFieldPresentation,
   getNextLevel,
   type BattleCue,
   type Enemy,
   type Equipment,
   type GameState,
   type Player,
-  tileClass
+  getFieldTileStyle
 } from "@/lib/learning-rpg-game";
 import { HeroSprite } from "@/components/product-lab/learning-rpg/HeroSprite";
+import type { HeroFacing } from "@/components/product-lab/learning-rpg/HeroSprite";
 import { EnemySprite } from "@/components/product-lab/learning-rpg/EnemySprite";
 import { BossSprite } from "@/components/product-lab/learning-rpg/BossSprite";
 
@@ -86,6 +88,8 @@ export function TownScreen({
 export function FieldScreen({
   game,
   field,
+  heroFacing,
+  heroWalking,
   onMove,
   onTown,
   onSeek,
@@ -93,15 +97,24 @@ export function FieldScreen({
 }: {
   game: GameState;
   field: FieldDefinition;
+  heroFacing: HeroFacing;
+  heroWalking: boolean;
   onMove: (direction: "up" | "down" | "left" | "right") => void;
   onTown: () => void;
   onSeek: () => void;
   onStatus: () => void;
 }) {
+  const presentation = getFieldPresentation(field.fieldId);
   return (
-    <GamePanel title={field.name} subtitle="探索">
+    <GamePanel title={field.name} subtitle={presentation.subtitle} className={presentation.panelClassName}>
       <div className="grid gap-4 xl:grid-cols-[1fr_240px]">
-        <div className="overflow-x-auto rounded-[6px] border border-[#394b39] bg-[#1b2b22]">
+        <div className={`overflow-x-auto rounded-[6px] border ${presentation.gridShellClassName}`}>
+          <div className="border-b border-white/5 bg-white/5 px-3 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={`rounded-full border px-3 py-1 text-[11px] font-black tracking-[0.18em] uppercase ${presentation.badgeClassName}`}>{presentation.moodLabel}</span>
+              <span className="text-xs font-bold tracking-[0.14em] text-[#d7e0e8] uppercase">16 × 12 / multiple field loop</span>
+            </div>
+          </div>
           <div
             className="grid min-w-max"
             style={{
@@ -135,8 +148,15 @@ export function FieldScreen({
                         : "";
 
                 return (
-                  <div key={`${x}-${y}`} className={`relative border border-black/20 ${tileClass(tile)}`}>
-                    {playerHere ? <HeroSprite /> : null}
+                  <div
+                    key={`${x}-${y}`}
+                    className="relative border border-black/20"
+                    style={{
+                      ...getFieldTileStyle(field.fieldId, tile, { x, y }),
+                      backgroundColor: "rgba(16, 24, 32, 0.1)"
+                    }}
+                  >
+                    {playerHere ? <HeroSprite facing={heroFacing} walking={heroWalking} /> : null}
                     {!playerHere && label ? <span className={`absolute inset-0 grid place-items-center text-[10px] font-black ${tile === "forest" || tile === "boss" || tile === "goal" ? "text-white" : "text-[#16222d]"}`}>{label}</span> : null}
                   </div>
                 );
@@ -146,8 +166,9 @@ export function FieldScreen({
         </div>
 
         <div className="grid gap-3 content-start">
-          <div className="rounded-[6px] border border-[#40505c] bg-[#101820] p-3">
+          <div className={`rounded-[6px] border p-3 ${presentation.infoCardClassName}`}>
             <p className="text-xs font-bold tracking-[0.18em] text-[#8aa0ad] uppercase">FIELD INFO</p>
+            <p className={`mt-1 text-xs font-bold tracking-[0.14em] uppercase ${presentation.infoTitleClassName}`}>{field.name}</p>
             <div className="mt-3 grid gap-2 text-sm">
               <Info label="FIELD ID" value={field.fieldId} dark />
               <Info label="SIZE" value={`${field.width} × ${field.height}`} dark />
@@ -492,9 +513,9 @@ function handleTownTile(index: number, onNpc: (kind: "goal" | "heal" | "shop" | 
   if (index === 18) onNpc("world");
 }
 
-function GamePanel({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+function GamePanel({ title, subtitle, children, className }: { title: string; subtitle: string; children: ReactNode; className?: string }) {
   return (
-    <section className="rounded-[6px] border border-[#40505c] bg-[linear-gradient(180deg,#17222d_0%,#101820_100%)] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)]">
+    <section className={`rounded-[6px] border border-[#40505c] p-4 shadow-[0_18px_50px_rgba(0,0,0,0.22)] ${className ?? "bg-[linear-gradient(180deg,#17222d_0%,#101820_100%)]"}`}>
       <div className="mb-4">
         <p className="text-xs font-bold tracking-[0.18em] text-[#c8d1d6] uppercase">{title}</p>
         <h2 className="mt-1 text-xl font-black text-white">{subtitle}</h2>

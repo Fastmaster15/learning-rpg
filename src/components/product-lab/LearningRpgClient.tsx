@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { LearningRpgDashboard } from "@/lib/learning-rpg";
 
 import {
@@ -34,6 +34,7 @@ import { selectLearningThemePlan } from "@/lib/learning-rpg-learning";
 import { loadGame, saveGame } from "@/lib/learning-rpg-persistence";
 import { BattleScreen, FieldScreen, MessageWindow, StatusBar, StatusScreen, TownScreen } from "@/components/product-lab/LearningRpgScreens";
 import { BossSprite } from "@/components/product-lab/learning-rpg/BossSprite";
+import type { HeroFacing } from "@/components/product-lab/learning-rpg/HeroSprite";
 
 type LearningRpgClientProps = {
   dashboard: LearningRpgDashboard;
@@ -45,7 +46,10 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
   const [battleIntroActive, setBattleIntroActive] = useState(false);
   const [battleIntroStep, setBattleIntroStep] = useState<0 | 1 | 2>(0);
   const [learningGateOpen, setLearningGateOpen] = useState(false);
+  const [heroFacing, setHeroFacing] = useState<HeroFacing>("down");
+  const [heroWalking, setHeroWalking] = useState(false);
   const [hasSave, setHasSave] = useState(false);
+  const heroWalkingTimer = useRef<number | null>(null);
   const player = game.player;
   const attack = player.attack + (equipment[player.weaponId]?.attack ?? 0);
   const defense = player.defense + (equipment[player.armorId]?.defense ?? 0);
@@ -97,6 +101,14 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
     }, game.battleCue.special ? 840 : 620);
     return () => window.clearTimeout(timeout);
   }, [game.battleCue]);
+
+  useEffect(() => {
+    return () => {
+      if (heroWalkingTimer.current !== null) {
+        window.clearTimeout(heroWalkingTimer.current);
+      }
+    };
+  }, []);
 
   function startNewGame() {
     setGame({
@@ -216,6 +228,16 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
   }
 
   function move(direction: "up" | "down" | "left" | "right") {
+    setHeroFacing(direction);
+    setHeroWalking(true);
+    if (heroWalkingTimer.current !== null) {
+      window.clearTimeout(heroWalkingTimer.current);
+    }
+    heroWalkingTimer.current = window.setTimeout(() => {
+      setHeroWalking(false);
+      heroWalkingTimer.current = null;
+    }, 220);
+
     setGame((current) => {
       const field = getCurrentField(current);
       const currentFieldId = current.fieldId ?? current.currentFieldId ?? initialGameState.fieldId;
@@ -511,7 +533,7 @@ export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClie
             <TownScreen game={game} field={currentField} onNpc={talkToNpc} onRest={restAtInn} onBuy={buyEquipment} onField={() => enterField(game.fieldId ?? initialGameState.fieldId)} onStatus={openStatus} />
           ) : null}
           {game.screen === "field" || game.screen === "battle" ? (
-            <FieldScreen game={game} field={currentField} onMove={move} onTown={() => returnToTown()} onSeek={seekBattle} onStatus={openStatus} />
+            <FieldScreen game={game} field={currentField} heroFacing={heroFacing} heroWalking={heroWalking} onMove={move} onTown={() => returnToTown()} onSeek={seekBattle} onStatus={openStatus} />
           ) : null}
           {game.screen === "status" ? <StatusScreen player={player} attack={attack} defense={defense} onBack={closeStatus} /> : null}
         </section>

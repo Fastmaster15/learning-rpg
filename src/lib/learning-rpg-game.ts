@@ -79,6 +79,16 @@ export type FieldDefinition = {
   transitions: Record<string, FieldTransition>;
 };
 
+export type FieldPresentation = {
+  subtitle: string;
+  moodLabel: string;
+  panelClassName: string;
+  gridShellClassName: string;
+  infoCardClassName: string;
+  infoTitleClassName: string;
+  badgeClassName: string;
+};
+
 export type GameState = {
   started: boolean;
   screen: Screen;
@@ -803,6 +813,54 @@ export const fields: Record<FieldId, FieldDefinition> = {
   }
 };
 
+export function getFieldPresentation(fieldId: FieldId): FieldPresentation {
+  if (fieldId === "town_outskirts") {
+    return {
+      subtitle: "町の安心感が残る外縁",
+      moodLabel: "町の外だけど、まだ安全",
+      panelClassName: "bg-[linear-gradient(180deg,#22352c_0%,#101820_100%)]",
+      gridShellClassName: "border-[#5c7d5f] bg-[radial-gradient(circle_at_top,#385246_0%,#17251f_44%,#101820_100%)]",
+      infoCardClassName: "border-[#5c7d5f] bg-[#101820]",
+      infoTitleClassName: "text-[#cfe5cf]",
+      badgeClassName: "border-[#91bd74] bg-[#193120] text-[#dff6d8]"
+    };
+  }
+
+  if (fieldId === "grassland_road") {
+    return {
+      subtitle: "見えているから進みたくなる街道",
+      moodLabel: "先が見える導線",
+      panelClassName: "bg-[linear-gradient(180deg,#27351e_0%,#101820_100%)]",
+      gridShellClassName: "border-[#7e9762] bg-[radial-gradient(circle_at_top,#425135_0%,#1b2616_46%,#101820_100%)]",
+      infoCardClassName: "border-[#7e9762] bg-[#101820]",
+      infoTitleClassName: "text-[#dfe8cf]",
+      badgeClassName: "border-[#d8c48d] bg-[#312b18] text-[#f7e7b8]"
+    };
+  }
+
+  if (fieldId === "forest_edge") {
+    return {
+      subtitle: "見えているのに気になる森の入口",
+      moodLabel: "気になる地形が増える",
+      panelClassName: "bg-[linear-gradient(180deg,#183021_0%,#101820_100%)]",
+      gridShellClassName: "border-[#4f7856] bg-[radial-gradient(circle_at_top,#27402d_0%,#152018_48%,#101820_100%)]",
+      infoCardClassName: "border-[#4f7856] bg-[#101820]",
+      infoTitleClassName: "text-[#c7e2cf]",
+      badgeClassName: "border-[#8de0b1] bg-[#173322] text-[#dbffe9]"
+    };
+  }
+
+  return {
+    subtitle: "学ぶと道が開く終盤の気配",
+    moodLabel: "知識の門が見える",
+    panelClassName: "bg-[linear-gradient(180deg,#1b2535_0%,#101820_100%)]",
+    gridShellClassName: "border-[#51627a] bg-[radial-gradient(circle_at_top,#24334a_0%,#151f2f_47%,#101820_100%)]",
+    infoCardClassName: "border-[#51627a] bg-[#101820]",
+    infoTitleClassName: "text-[#d6deea]",
+    badgeClassName: "border-[#8db8ff] bg-[#182338] text-[#dbe7ff]"
+  };
+}
+
 export const fieldOrder: FieldId[] = [TOWN_OUTSKIRTS_FIELD_ID, GRASSLAND_ROAD_FIELD_ID, FOREST_EDGE_FIELD_ID, FOREST_DEPTH_FIELD_ID];
 
 export const initialPlayer: Player = {
@@ -988,6 +1046,81 @@ export function tileClass(tile: FieldTile) {
     landmark: "bg-[#8a8f96]"
   };
   return classes[tile] ?? "bg-[#91bd74]";
+}
+
+const TILE_ATLAS_COLUMNS = 8;
+const TILE_ATLAS_ROWS = 5;
+const FIELD_TEXTURE_ROOT = "/images/learning-rpg/field-atlas";
+
+function atlasPosition(index: number) {
+  const zeroBased = index - 1;
+  return {
+    column: zeroBased % TILE_ATLAS_COLUMNS,
+    row: Math.floor(zeroBased / TILE_ATLAS_COLUMNS)
+  };
+}
+
+function spriteStyle(fileName: string, index: number) {
+  const position = atlasPosition(index);
+  return {
+    backgroundImage: `url(${FIELD_TEXTURE_ROOT}/${fileName})`,
+    backgroundRepeat: "no-repeat",
+    backgroundSize: `${TILE_ATLAS_COLUMNS * 100}% ${TILE_ATLAS_ROWS * 100}%`,
+    backgroundPosition: `${(position.column * 100) / (TILE_ATLAS_COLUMNS - 1)}% ${(position.row * 100) / (TILE_ATLAS_ROWS - 1)}%`
+  };
+}
+
+function selectVariant(seed: number, variants: number[]) {
+  return variants[Math.abs(seed) % variants.length] ?? variants[0];
+}
+
+function tileSeed(fieldId: FieldId, x: number, y: number) {
+  return `${fieldId}:${x}:${y}`.split("").reduce((value, char) => value + char.charCodeAt(0), 0);
+}
+
+export function getFieldTileStyle(fieldId: FieldId, tile: FieldTile, position?: Position) {
+  const x = position?.x ?? 0;
+  const y = position?.y ?? 0;
+  const seed = tileSeed(fieldId, x, y);
+  const roadAtlas = fieldId === "forest_depth" ? "forest-depth.jpg" : fieldId === "forest_edge" ? "forest-edge.jpg" : "grassland-road.jpg";
+  const forestAtlas = fieldId === "forest_depth" ? "forest-depth.jpg" : "forest-edge.jpg";
+
+  if (tile === "water") {
+    return spriteStyle(fieldId === "forest_depth" ? "forest-depth.jpg" : "forest-edge.jpg", selectVariant(seed, [89, 92, 96, 109, 110, 111, 114, 115]));
+  }
+  if (tile === "shore") {
+    return spriteStyle(fieldId === "town_outskirts" ? "town-outskirts.jpg" : "forest-edge.jpg", selectVariant(seed, [105, 113, 114, 116]));
+  }
+  if (tile === "grass") {
+    if (fieldId === "town_outskirts") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [1, 3, 7, 8, 17, 25, 27, 30, 31, 33, 34, 35, 36, 37, 38, 39]));
+    if (fieldId === "grassland_road") return spriteStyle("grassland-road.jpg", selectVariant(seed, [1, 3, 7, 8, 27, 30, 31, 34, 36, 37, 105, 106]));
+    if (fieldId === "forest_edge") return spriteStyle("forest-edge.jpg", selectVariant(seed, [41, 42, 51, 57, 58, 59, 62, 68, 69, 76]));
+    return spriteStyle("forest-depth.jpg", selectVariant(seed, [41, 42, 57, 58, 59, 62, 68, 69, 76, 77]));
+  }
+  if (tile === "road") {
+    if (fieldId === "town_outskirts") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [4, 15, 21, 22, 36, 37, 145, 146]));
+    if (fieldId === "grassland_road") return spriteStyle("grassland-road.jpg", selectVariant(seed, [4, 5, 29, 36, 37, 151, 162, 163]));
+    return spriteStyle(roadAtlas, selectVariant(seed, [4, 5, 29, 36, 37, 46, 47, 48]));
+  }
+  if (tile === "forest") {
+    if (fieldId === "forest_depth") return spriteStyle("forest-depth.jpg", selectVariant(seed, [9, 10, 31, 34, 35, 51, 57, 58, 68, 69, 76, 77]));
+    return spriteStyle("forest-edge.jpg", selectVariant(seed, [9, 10, 31, 34, 35, 51, 57, 58, 59, 62]));
+  }
+  if (tile === "chest") return spriteStyle("boss-depth.jpg", selectVariant(seed, [15, 71, 175, 19]));
+  if (tile === "boss") return spriteStyle("boss-depth.jpg", selectVariant(seed, [21, 181, 182, 200]));
+  if (tile === "hill") {
+    if (fieldId === "town_outskirts") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [11, 12, 13, 26, 31, 32]));
+    if (fieldId === "grassland_road") return spriteStyle("grassland-road.jpg", selectVariant(seed, [1, 9, 41, 42, 57, 58, 59, 62]));
+    return spriteStyle(forestAtlas, selectVariant(seed, [1, 9, 41, 42, 57, 58, 59, 62, 63, 64]));
+  }
+  if (tile === "goal") return spriteStyle("boss-depth.jpg", selectVariant(seed, [20, 159, 180, 182]));
+  if (tile === "town") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [21, 22, 129, 130, 142, 154]));
+  if (tile === "gate") {
+    if (fieldId === "town_outskirts") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [17, 18, 35, 36, 37, 145, 146]));
+    if (fieldId === "forest_depth") return spriteStyle("forest-depth.jpg", selectVariant(seed, [17, 18, 35, 36, 37, 46, 47]));
+    return spriteStyle("grassland-road.jpg", selectVariant(seed, [17, 18, 35, 36, 37, 46, 47]));
+  }
+  return spriteStyle("grassland-road.jpg", 1);
 }
 
 export function getLocationLabel(game: GameState) {
