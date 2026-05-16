@@ -1,5 +1,6 @@
 import {
   type GameState,
+  type BattleCue,
   type Screen,
   applyLevelUps,
   calcDamage,
@@ -7,25 +8,57 @@ import {
   playTone
 } from "@/lib/learning-rpg-game";
 
-export function enemyTurn(game: GameState, logs: string[]) {
-  if (!game.currentEnemy) return game;
-  const damage = calcDamage(game.currentEnemy.attack, getDefense(game.player));
+const bossMoves = ["翠嵐崩撃", "木霊裂爪", "根砕きの一振り", "森鳴きの大震"] as const;
+
+export function enemyTurn(game: GameState, logs: string[]): { game: GameState; cue: BattleCue | null } {
+  if (!game.currentEnemy) return { game, cue: null };
+  const enemy = game.currentEnemy;
+  const isBoss = enemy.role === "mini_boss";
+  const special = isBoss && Math.random() < 0.35;
+  const moveName = special ? bossMoves[Math.floor(Math.random() * bossMoves.length)] : undefined;
+  const attackPower = special ? enemy.attack + 6 : enemy.attack;
+  const damage = calcDamage(attackPower, getDefense(game.player)) + (special ? 3 : 0);
   const hp = Math.max(0, game.player.hp - damage);
   if (hp <= 0) {
+    if (isBoss && special) {
+      playTone("boss_charge");
+    } else if (isBoss) {
+      playTone("boss_attack");
+    }
     return {
+      game: {
       ...game,
       screen: "town" as Screen,
       currentEnemy: null,
+      battleCue: null,
       player: { ...game.player, hp: Math.max(1, Math.floor(game.player.maxHp / 2)) },
       dialogue: "目を覚ますと町に戻っていた。宿屋で体勢を立て直そう。",
       log: [...logs, `${game.currentEnemy.name}のこうげき！`, `${game.player.name}は${damage}のダメージをうけた！`, "目を覚ますと町に戻っていた。", ...game.log].slice(0, 8)
+      },
+      cue: isBoss ? { kind: "boss-attack", special, moveName } : null
     };
   }
 
+  if (isBoss && special) {
+    playTone("boss_charge");
+  } else if (isBoss) {
+    playTone("boss_attack");
+  }
+
   return {
-    ...game,
-    player: { ...game.player, hp },
-    log: [...logs, `${game.currentEnemy.name}のこうげき！`, `${game.player.name}は${damage}のダメージをうけた！`, ...game.log].slice(0, 8)
+    game: {
+      ...game,
+      player: { ...game.player, hp },
+      battleCue: isBoss ? { kind: "boss-attack", special, moveName } : null,
+      log: [
+        ...logs,
+        ...(isBoss && special ? [`${moveName}！`, `${game.currentEnemy.name}が大地を揺らした！`] : []),
+        `${game.currentEnemy.name}のこうげき！`,
+        `${game.player.name}は${damage}のダメージをうけた！`,
+        ...game.log
+      ].slice(0, 8)
+    },
+    cue: isBoss ? { kind: "boss-attack", special, moveName } : null
   };
 }
 
@@ -43,6 +76,7 @@ export function winBattle(game: GameState, logs: string[]) {
     ...game,
     screen: "field" as Screen,
     currentEnemy: null,
+    battleCue: null,
     player: leveledPlayer,
     objectiveCleared: miniBossWon ? true : game.objectiveCleared,
     miniBossDefeated: miniBossWon ? true : game.miniBossDefeated,

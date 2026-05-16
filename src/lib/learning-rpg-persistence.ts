@@ -26,6 +26,7 @@ export function loadGame() {
       previousScreen: parsed.previousScreen ?? (screen === "battle" ? "field" : "town"),
       fieldId,
       currentFieldId: fieldId,
+      battleCue: null,
       player: {
         ...initialPlayer,
         ...parsed.player,

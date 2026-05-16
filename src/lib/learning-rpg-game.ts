@@ -74,12 +74,19 @@ export type GameState = {
   player: Player;
   position: Position;
   currentEnemy: Enemy | null;
+  battleCue?: BattleCue | null;
   log: string[];
   dialogue: string;
   steps: number;
   objectiveCleared: boolean;
   openedChestIds: string[];
   miniBossDefeated: boolean;
+};
+
+export type BattleCue = {
+  kind: "boss-attack";
+  special: boolean;
+  moveName?: string;
 };
 
 export const levelTable = [
@@ -806,6 +813,7 @@ export const initialGameState: GameState = {
   player: initialPlayer,
   position: fields[TOWN_OUTSKIRTS_FIELD_ID].entryPosition,
   currentEnemy: null,
+  battleCue: null,
   log: ["旅の準備ができた。"],
   dialogue: "町の人に話しかけて、北の森へ向かう目的を聞こう。",
   steps: 0,
@@ -882,15 +890,31 @@ export function getFieldTransition(fieldId: FieldId, position: Position) {
   return getField(fieldId).transitions[posKey(position)] ?? null;
 }
 
-export function shouldEncounter(fieldId: FieldId, tile: FieldTile, steps: number) {
+export function shouldEncounter(fieldId: FieldId, tile: FieldTile, steps: number, roll = Math.random()) {
   const field = getField(fieldId);
   if (field.encounterArea === "safe" || tile === "water" || tile === "town" || tile === "gate" || tile === "chest" || tile === "goal" || tile === "boss") return false;
-  if (field.encounterArea === "grassland") return (tile === "grass" || tile === "road" || tile === "hill") && steps % 4 === 0;
-  if (field.encounterArea === "forest") return (tile === "forest" || tile === "grass") && steps % 2 === 0;
-  if (field.encounterArea === "forest_depth") return (tile === "forest" || tile === "hill" || tile === "grass") && steps % 2 === 0;
-  if (tile === "forest") return steps % 2 === 0;
-  if (tile === "grass" || tile === "hill" || tile === "road") return steps % 3 === 0;
-  return false;
+  if (steps < 2) return false;
+
+  const chance =
+    field.encounterArea === "grassland"
+      ? tile === "road"
+        ? 0.12
+        : tile === "hill"
+          ? 0.16
+          : 0.2
+      : field.encounterArea === "forest"
+        ? tile === "forest"
+          ? 0.36
+          : 0.22
+        : field.encounterArea === "forest_depth"
+          ? tile === "forest"
+            ? 0.42
+            : 0.3
+          : tile === "forest"
+            ? 0.28
+            : 0.14;
+
+  return roll < chance;
 }
 
 export function spawnEnemy(fieldId: FieldId, tile: FieldTile): Enemy {
@@ -899,7 +923,7 @@ export function spawnEnemy(fieldId: FieldId, tile: FieldTile): Enemy {
     field.encounterArea === "grassland"
       ? enemies.filter((enemy) => enemy.area === "grassland")
       : field.encounterArea === "forest_depth"
-        ? enemies.filter((enemy) => enemy.area === "forest_depth" || enemy.area === "forest")
+        ? enemies.filter((enemy) => enemy.area === "forest")
         : enemies.filter((enemy) => enemy.area === "forest" || enemy.area === "forest_depth");
   const preferred = tile === "forest" && field.encounterArea !== "grassland" ? enemies.filter((enemy) => enemy.area === "forest" || enemy.area === "forest_depth") : pool;
   const base = preferred[Math.floor(Math.random() * preferred.length)] ?? enemies[0];
@@ -977,7 +1001,7 @@ export function getLocationLabel(game: GameState) {
   return labels[tile] ?? field.name;
 }
 
-export function playTone(kind: "victory" | "level" | "treasure" | "boss") {
+export function playTone(kind: "victory" | "level" | "treasure" | "boss" | "boss_attack" | "boss_charge") {
   if (typeof window === "undefined") return;
   const AudioContextClass = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AudioContextClass) return;
@@ -989,7 +1013,9 @@ export function playTone(kind: "victory" | "level" | "treasure" | "boss") {
       victory: [523, 659, 784],
       level: [659, 784, 988],
       treasure: [784, 988],
-      boss: [392, 523, 659, 1046]
+      boss: [392, 523, 659, 1046],
+      boss_attack: [196, 247, 220],
+      boss_charge: [311, 370, 466, 523]
     }[kind];
 
     sequence.forEach((frequency, index) => {

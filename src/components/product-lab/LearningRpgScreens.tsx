@@ -6,6 +6,7 @@ import {
   equipment,
   getFieldTransition,
   getNextLevel,
+  type BattleCue,
   type Enemy,
   type Equipment,
   type GameState,
@@ -13,6 +14,8 @@ import {
   tileClass
 } from "@/lib/learning-rpg-game";
 import { HeroSprite } from "@/components/product-lab/learning-rpg/HeroSprite";
+import { EnemySprite } from "@/components/product-lab/learning-rpg/EnemySprite";
+import { BossSprite } from "@/components/product-lab/learning-rpg/BossSprite";
 
 export function StatusBar({ player, attack, defense, nextExp, location }: { player: Player; attack: number; defense: number; nextExp: number; location: string }) {
   return (
@@ -168,6 +171,7 @@ export function BattleScreen({
   enemy,
   player,
   herbCount,
+  battleCue,
   onAttack,
   onFire,
   onHeal,
@@ -177,6 +181,7 @@ export function BattleScreen({
   enemy: Enemy | null;
   player: Player;
   herbCount: number;
+  battleCue?: BattleCue | null;
   onAttack: () => void;
   onFire: () => void;
   onHeal: () => void;
@@ -184,27 +189,267 @@ export function BattleScreen({
   onFlee: () => void;
 }) {
   if (!enemy) return null;
+  const bossBattle = enemy.role === "mini_boss";
+  const bossAction = battleCue?.kind === "boss-attack";
+  const bossSpecial = bossAction && battleCue.special;
   return (
-    <GamePanel title="戦闘" subtitle={`${enemy.name}があらわれた`}>
-      <div className="grid gap-4">
-        <div className="grid gap-3 md:grid-cols-2">
-          <FighterWindow name={player.name} hp={player.hp} maxHp={player.maxHp} mp={player.mp} maxMp={player.maxMp} />
-          <FighterWindow name={enemy.name} hp={enemy.hp} maxHp={enemy.maxHp} />
-        </div>
-        <div className="grid min-h-[180px] place-items-center rounded-[6px] border border-[#40505c] bg-[radial-gradient(circle_at_top,#334a58_0%,#17222d_48%,#101820_100%)]">
-          <div className="grid h-24 w-28 place-items-center rounded-[6px] border border-[#7c5f5f] bg-[#2a1c1c] text-center text-sm font-black text-[#f4eddc] shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
-            {enemy.name}
+    <div className="fixed inset-0 z-50 grid place-items-center bg-black/60 p-3 backdrop-blur-[2px]">
+      <section className="w-full max-w-6xl rounded-[8px] border border-[#566c7c] bg-[linear-gradient(180deg,#1b2833_0%,#101820_100%)] p-3 shadow-[0_24px_70px_rgba(0,0,0,0.48)] md:p-4">
+        <div className="mb-3 flex items-start justify-between gap-3">
+          <div>
+            <p className="text-xs font-bold tracking-[0.18em] text-[#c8d1d6] uppercase">戦闘窓</p>
+            <h2 className="mt-1 text-xl font-black text-white">{enemy.name}があらわれた</h2>
+          </div>
+          <div className="rounded-full border border-[#f3c57a] bg-[#f3c57a] px-3 py-1 text-xs font-black text-[#16222d]">
+            FIELD BATTLE
           </div>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
-          <CommandButton label="たたかう" detail="通常攻撃" onClick={onAttack} />
-          <CommandButton label="火の玉" detail="MP 3 / 強攻撃" onClick={onFire} disabled={player.mp < 3} />
-          <CommandButton label="小回復" detail="MP 3 / ターン消費" onClick={onHeal} disabled={player.mp < 3} />
-          <CommandButton label={`薬草 ${herbCount}`} detail="HP回復 / ターン消費" onClick={onHerb} disabled={herbCount <= 0} />
-          <CommandButton label="にげる" detail={enemy.role === "mini_boss" ? "小ボス戦は不可" : "成功率70%"} onClick={onFlee} />
+        <div className="grid gap-4">
+          <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="grid gap-3">
+              <div className="grid gap-3 md:grid-cols-2">
+                <FighterWindow name={player.name} hp={player.hp} maxHp={player.maxHp} mp={player.mp} maxMp={player.maxMp} />
+                <FighterWindow name={enemy.name} hp={enemy.hp} maxHp={enemy.maxHp} />
+              </div>
+              <div className="relative overflow-hidden rounded-[8px] border border-[#40505c] bg-[radial-gradient(circle_at_top,#334a58_0%,#17222d_48%,#101820_100%)]">
+                <div className={`absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(243,197,122,0.14),transparent_35%),radial-gradient(circle_at_80%_24%,rgba(141,224,177,0.12),transparent_34%),radial-gradient(circle_at_50%_100%,rgba(255,255,255,0.05),transparent_30%)] ${bossAction ? "animate-[boss-aura_0.65s_ease-in-out_1]" : ""}`} />
+                <div className="absolute inset-x-0 top-0 h-14 bg-gradient-to-b from-[#f3c57a]/10 to-transparent" />
+                <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-[#0d1118]/55 to-transparent" />
+                <div className="absolute left-6 top-6 h-24 w-24 rounded-full bg-[#6da1c9]/14 blur-2xl" />
+                <div className="absolute right-8 top-10 h-28 w-28 rounded-full bg-[#8de0b1]/10 blur-3xl" />
+                <div className="relative grid min-h-[300px] grid-cols-[1fr_auto_1fr] items-center gap-3 p-4 md:min-h-[330px]">
+                  <div className="grid justify-items-start gap-2">
+                    <div className="text-xs font-bold tracking-[0.18em] text-[#8aa0ad] uppercase">Hero</div>
+                    <div className={`relative h-[208px] w-[208px] animate-[battle-bob_3s_ease-in-out_infinite] ${bossAction ? "translate-x-1" : ""}`}>
+                      <HeroSprite />
+                    </div>
+                  </div>
+                  <div className="relative h-[220px] w-10">
+                    <div className="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-gradient-to-b from-transparent via-[#f3c57a]/40 to-transparent" />
+                    <div className={`absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[#f3c57a]/15 blur-xl ${bossSpecial ? "animate-[battle-flash_0.9s_ease-in-out_1]" : bossAction ? "animate-[battle-flash_0.55s_ease-in-out_1]" : "animate-[battle-flash_2.8s_ease-in-out_infinite]"}`} />
+                    <div className={`absolute left-0 top-1/2 h-[4px] w-14 -translate-y-1/2 rounded-full bg-gradient-to-r from-transparent via-[#fff3bf] to-transparent blur-[1px] ${bossSpecial ? "animate-[battle-slash-strong_0.85s_ease-in-out_1]" : bossAction ? "animate-[battle-slash-hit_0.55s_ease-in-out_1]" : "animate-[battle-slash_1.7s_ease-in-out_infinite]"}`} />
+                    <div className={`absolute left-1 top-[calc(50%-24px)] h-12 w-12 rounded-full bg-[#fff3bf]/20 blur-2xl ${bossSpecial ? "animate-[battle-flash-strong_0.85s_ease-in-out_1]" : bossAction ? "animate-[battle-flash-hit_0.55s_ease-in-out_1]" : "animate-[battle-flash_2.8s_ease-in-out_infinite]"}`} />
+                  </div>
+                  <div className="grid justify-items-end gap-2">
+                    <div className="text-xs font-bold tracking-[0.18em] text-[#8aa0ad] uppercase">Enemy</div>
+                    <div
+                      className={`relative ${bossBattle ? "h-[320px] w-[320px] md:h-[390px] md:w-[390px]" : "h-[208px] w-[208px]"} animate-[battle-bob_3.6s_ease-in-out_infinite] ${
+                        bossSpecial
+                          ? "translate-x-[-18px] scale-[1.03]"
+                          : bossAction
+                            ? "translate-x-[-10px] scale-[1.02]"
+                            : bossBattle
+                              ? "scale-[1.02]"
+                              : ""
+                      }`}
+                    >
+                      {bossBattle ? <BossSprite /> : <EnemySprite enemy={enemy} />}
+                      {bossBattle ? (
+                        <div
+                          className={`absolute inset-0 rounded-[12px] border border-[#b0d65f]/30 ${
+                            bossSpecial ? "animate-[boss-lunge_0.85s_ease-out_1]" : bossAction ? "animate-[boss-thump_0.55s_ease-out_1]" : "animate-[boss-breath_4s_ease-in-out_infinite]"
+                          }`}
+                        />
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+                {bossBattle && bossAction ? (
+                  <div className="absolute left-1/2 top-4 -translate-x-1/2 rounded-full border border-[#d8ff7a]/40 bg-[#16220f]/80 px-4 py-2 text-xs font-black tracking-[0.2em] text-[#d8ff7a] shadow-[0_0_30px_rgba(216,255,122,0.2)]">
+                    {bossSpecial ? battleCue?.moveName ?? "森の主の大技" : "森の主の一撃"}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+            <div className="grid gap-3 content-start">
+              <MessageWindow title="BATTLE LOG">
+                <div className="grid gap-2 text-sm leading-6">
+                  <p>{enemy.name}との戦闘が始まった。</p>
+                  <p>フィールドを背景に、左に主人公、右に敵が並ぶFF風の構図にしている。</p>
+                  <p>{bossBattle ? "森の主は大きく表示し、大技のたびに揺れと光が走る。" : "斬撃の線と光を少しだけ入れて、戦っている感を強めた。"}</p>
+                </div>
+              </MessageWindow>
+              <MessageWindow title="TACTICS">
+                <div className="grid gap-2 text-sm leading-6">
+                  <p>たたかう: 安定した通常攻撃。</p>
+                  <p>火の玉: MPを使って強く攻める。</p>
+                  <p>回復: 小回復か薬草で立て直す。</p>
+                </div>
+              </MessageWindow>
+            </div>
+          </div>
+          <div className="rounded-[8px] border border-[#566c7c] bg-[#0f151c] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <p className="text-xs font-bold tracking-[0.18em] text-[#c8d1d6] uppercase">COMMAND</p>
+              <p className="text-xs font-bold tracking-[0.18em] text-[#8aa0ad] uppercase">Choose your move</p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+              <CommandButton label="たたかう" detail="通常攻撃" onClick={onAttack} />
+              <CommandButton label="火の玉" detail="MP 3 / 強攻撃" onClick={onFire} disabled={player.mp < 3} />
+              <CommandButton label="小回復" detail="MP 3 / ターン消費" onClick={onHeal} disabled={player.mp < 3} />
+              <CommandButton label={`薬草 ${herbCount}`} detail="HP回復 / ターン消費" onClick={onHerb} disabled={herbCount <= 0} />
+              <CommandButton label="にげる" detail={enemy.role === "mini_boss" ? "小ボス戦は不可" : "成功率70%"} onClick={onFlee} />
+            </div>
+          </div>
         </div>
-      </div>
-    </GamePanel>
+        <style jsx global>{`
+          @keyframes battle-bob {
+            0%,
+            100% {
+              transform: translateY(0);
+            }
+            50% {
+              transform: translateY(-6px);
+            }
+          }
+          @keyframes battle-slash {
+            0%,
+            72% {
+              opacity: 0;
+              transform: translateX(-12px) scaleX(0.4);
+            }
+            78% {
+              opacity: 1;
+              transform: translateX(0) scaleX(1);
+            }
+            88% {
+              opacity: 0.2;
+              transform: translateX(6px) scaleX(0.7);
+            }
+            100% {
+              opacity: 0;
+              transform: translateX(12px) scaleX(0.3);
+            }
+          }
+          @keyframes battle-flash {
+            0%,
+            74% {
+              opacity: 0;
+            }
+            80% {
+              opacity: 1;
+            }
+            100% {
+              opacity: 0;
+            }
+          }
+          @keyframes battle-intro-pulse {
+            0%,
+            100% {
+              transform: scale(0.9);
+              opacity: 0.55;
+            }
+            50% {
+              transform: scale(1.05);
+              opacity: 1;
+            }
+          }
+          @keyframes battle-flash-strong {
+            0%,
+            72% {
+              opacity: 0;
+              transform: scale(0.7);
+            }
+            80% {
+              opacity: 1;
+              transform: scale(1.25);
+            }
+            100% {
+              opacity: 0;
+              transform: scale(1.05);
+            }
+          }
+          @keyframes battle-flash-hit {
+            0%,
+            72% {
+              opacity: 0;
+              transform: scale(0.75);
+            }
+            85% {
+              opacity: 1;
+              transform: scale(1.1);
+            }
+            100% {
+              opacity: 0;
+              transform: scale(0.95);
+            }
+          }
+          @keyframes battle-slash-strong {
+            0%,
+            70% {
+              opacity: 0;
+              transform: translateX(-24px) scaleX(0.2);
+            }
+            78% {
+              opacity: 1;
+              transform: translateX(0) scaleX(1);
+            }
+            88% {
+              opacity: 0.65;
+              transform: translateX(12px) scaleX(1.2);
+            }
+            100% {
+              opacity: 0;
+              transform: translateX(24px) scaleX(0.1);
+            }
+          }
+          @keyframes battle-slash-hit {
+            0%,
+            75% {
+              opacity: 0;
+              transform: translateX(-16px) scaleX(0.3);
+            }
+            86% {
+              opacity: 0.9;
+              transform: translateX(0) scaleX(1);
+            }
+            100% {
+              opacity: 0;
+              transform: translateX(10px) scaleX(0.4);
+            }
+          }
+          @keyframes boss-lunge {
+            0%,
+            100% {
+              transform: scale(1);
+            }
+            45% {
+              transform: scale(1.05);
+            }
+            60% {
+              transform: scale(1.08) translateX(-6px);
+            }
+          }
+          @keyframes boss-thump {
+            0%,
+            100% {
+              transform: scale(1);
+            }
+            60% {
+              transform: scale(1.03) translateX(-4px);
+            }
+          }
+          @keyframes boss-breath {
+            0%,
+            100% {
+              transform: scale(1);
+            }
+            50% {
+              transform: scale(1.015);
+            }
+          }
+          @keyframes boss-aura {
+            0%,
+            100% {
+              opacity: 0.2;
+            }
+            50% {
+              opacity: 0.45;
+            }
+          }
+        `}</style>
+      </section>
+    </div>
   );
 }
 

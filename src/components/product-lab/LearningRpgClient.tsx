@@ -30,16 +30,21 @@ import {
   tileLabel
 } from "@/lib/learning-rpg-game";
 import { enemyTurn, winBattle } from "@/lib/learning-rpg-battle";
+import { selectLearningThemePlan } from "@/lib/learning-rpg-learning";
 import { loadGame, saveGame } from "@/lib/learning-rpg-persistence";
 import { BattleScreen, FieldScreen, MessageWindow, StatusBar, StatusScreen, TownScreen } from "@/components/product-lab/LearningRpgScreens";
+import { BossSprite } from "@/components/product-lab/learning-rpg/BossSprite";
 
 type LearningRpgClientProps = {
   dashboard: LearningRpgDashboard;
   initialThemeId?: string;
 };
 
-export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
+export function LearningRpgClient({ dashboard, initialThemeId }: LearningRpgClientProps) {
   const [game, setGame] = useState<GameState>(initialGameState);
+  const [battleIntroActive, setBattleIntroActive] = useState(false);
+  const [battleIntroStep, setBattleIntroStep] = useState<0 | 1 | 2>(0);
+  const [learningGateOpen, setLearningGateOpen] = useState(false);
   const [hasSave, setHasSave] = useState(false);
   const player = game.player;
   const attack = player.attack + (equipment[player.weaponId]?.attack ?? 0);
@@ -48,6 +53,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
   const herbCount = getItemCount(player, "herb");
   const location = getLocationLabel(game);
   const currentField = getCurrentField(game);
+  const learningPlan = selectLearningThemePlan(dashboard, initialThemeId);
 
   useEffect(() => {
     const saved = loadGame();
@@ -63,6 +69,34 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       setHasSave(true);
     }
   }, [game]);
+
+  useEffect(() => {
+    if (game.screen !== "battle" || !game.currentEnemy) {
+      setBattleIntroActive(false);
+      setBattleIntroStep(0);
+      return;
+    }
+
+    setBattleIntroActive(true);
+    setBattleIntroStep(0);
+    const step1 = window.setTimeout(() => setBattleIntroStep(1), 180);
+    const step2 = window.setTimeout(() => setBattleIntroStep(2), 520);
+    const end = window.setTimeout(() => setBattleIntroActive(false), 980);
+
+    return () => {
+      window.clearTimeout(step1);
+      window.clearTimeout(step2);
+      window.clearTimeout(end);
+    };
+  }, [game.screen, game.currentEnemy]);
+
+  useEffect(() => {
+    if (!game.battleCue) return;
+    const timeout = window.setTimeout(() => {
+      setGame((current) => (current.battleCue ? { ...current, battleCue: null } : current));
+    }, game.battleCue.special ? 840 : 620);
+    return () => window.clearTimeout(timeout);
+  }, [game.battleCue]);
 
   function startNewGame() {
     setGame({
@@ -231,11 +265,14 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
 
       if (tile === "goal") {
         if (!current.miniBossDefeated) {
+          const enemy = spawnMiniBoss();
           return {
             ...current,
+            screen: "battle",
             position: nextPosition,
-            dialogue: "森の奥の光は、まだ近づくには危うい。先に森のぬしに挑む準備をしよう。",
-            log: ["森の奥に強い気配がある。", ...current.log].slice(0, 8)
+            currentEnemy: enemy,
+            dialogue: "森の奥の光で、森のぬしが立ちはだかった。",
+            log: ["森の奥の光が揺れた。", `${enemy.name} があらわれた！`, ...current.log].slice(0, 8)
           };
         }
         return {
@@ -315,7 +352,13 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
     setGame((current) => {
       const fieldId = current.fieldId ?? current.currentFieldId ?? initialGameState.fieldId;
       const tile = getTile(fieldId, current.position);
-      const enemy = tile === "boss" ? spawnMiniBoss() : spawnEnemy(fieldId, tile);
+      if (tile === "goal" && current.miniBossDefeated) {
+        return {
+          ...current,
+          log: ["ここにはもう強い気配はない。", ...current.log].slice(0, 8)
+        };
+      }
+      const enemy = tile === "goal" ? spawnMiniBoss() : spawnEnemy(fieldId, tile);
       return {
         ...current,
         screen: "battle",
@@ -334,7 +377,8 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       if (enemy.hp <= 0) {
         return winBattle(current, logs);
       }
-      return enemyTurn({ ...current, currentEnemy: enemy }, logs);
+      const outcome = enemyTurn({ ...current, currentEnemy: enemy, battleCue: null }, logs);
+      return outcome.game;
     });
   }
 
@@ -347,13 +391,15 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       const player = { ...current.player, mp: current.player.mp - 3 };
       if (spell === "heal") {
         const healed = Math.min(player.maxHp, player.hp + 18);
-        return enemyTurn(
+        const outcome = enemyTurn(
           {
             ...current,
-            player: { ...player, hp: healed }
+            player: { ...player, hp: healed },
+            battleCue: null
           },
           [`${current.player.name}は小回復を唱えた。`, `HPが${healed - player.hp}回復した。`]
         );
+        return outcome.game;
       }
 
       const enemy = { ...current.currentEnemy, hp: Math.max(0, current.currentEnemy.hp - 12) };
@@ -361,7 +407,8 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       if (enemy.hp <= 0) {
         return winBattle({ ...current, player, currentEnemy: enemy }, logs);
       }
-      return enemyTurn({ ...current, player, currentEnemy: enemy }, logs);
+      const outcome = enemyTurn({ ...current, player, currentEnemy: enemy, battleCue: null }, logs);
+      return outcome.game;
     });
   }
 
@@ -376,7 +423,8 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
         hp: healed,
         items: current.player.items.map((item) => (item.itemId === "herb" ? { ...item, count: Math.max(0, item.count - 1) } : item))
       };
-      return enemyTurn({ ...current, player }, ["薬草を使った。", `HPが${healed - current.player.hp}回復した。`]);
+      const outcome = enemyTurn({ ...current, player, battleCue: null }, ["薬草を使った。", `HPが${healed - current.player.hp}回復した。`]);
+      return outcome.game;
     });
   }
 
@@ -384,7 +432,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
     setGame((current) => {
       if (!current.currentEnemy) return { ...current, screen: "field" };
       if (current.currentEnemy.role === "mini_boss") {
-        return enemyTurn(current, ["森の奥では逃げられない！"]);
+        return enemyTurn({ ...current, battleCue: null }, ["森の奥では逃げられない！"]).game;
       }
       if (Math.random() < 0.7) {
         return {
@@ -394,7 +442,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
           log: ["うまく逃げきった。", ...current.log].slice(0, 8)
         };
       }
-      return enemyTurn(current, ["逃げられなかった！"]);
+      return enemyTurn({ ...current, battleCue: null }, ["逃げられなかった！"]).game;
     });
   }
 
@@ -448,11 +496,8 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
           {game.screen === "town" ? (
             <TownScreen game={game} field={currentField} onNpc={talkToNpc} onRest={restAtInn} onBuy={buyEquipment} onField={() => enterField(game.fieldId ?? initialGameState.fieldId)} onStatus={openStatus} />
           ) : null}
-          {game.screen === "field" ? (
+          {game.screen === "field" || game.screen === "battle" ? (
             <FieldScreen game={game} field={currentField} onMove={move} onTown={() => returnToTown()} onSeek={seekBattle} onStatus={openStatus} />
-          ) : null}
-          {game.screen === "battle" ? (
-            <BattleScreen enemy={game.currentEnemy} player={player} herbCount={herbCount} onAttack={attackEnemy} onFire={() => castSpell("fire")} onHeal={() => castSpell("heal")} onHerb={useHerb} onFlee={fleeBattle} />
           ) : null}
           {game.screen === "status" ? <StatusScreen player={player} attack={attack} defense={defense} onBack={closeStatus} /> : null}
         </section>
@@ -471,9 +516,109 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
           <MessageWindow title="GOAL">
             <p>{game.objectiveCleared ? "森のぬしを倒した。プロトタイプはここまで。" : "町で準備し、宝箱を探し、北東の森の奥にいる森のぬしへ挑む。"}</p>
           </MessageWindow>
+          {learningPlan ? (
+            <MessageWindow title="LEARNING FRAME">
+              <div className="grid gap-3 text-sm leading-6">
+                <div className="grid gap-1">
+                  <p className="font-bold text-white">{learningPlan.name}</p>
+                  <p>{learningPlan.learningLoop}</p>
+                  <p>{learningPlan.designPrinciple}</p>
+                </div>
+
+                <div className="rounded-[6px] border border-[#40505c] bg-[#0d1118] p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-bold tracking-[0.18em] text-[#8aa0ad] uppercase">Learning Gate</p>
+                    <button
+                      type="button"
+                      onClick={() => setLearningGateOpen((current) => !current)}
+                      className="rounded-full border border-[#f3c57a] bg-[#f3c57a] px-3 py-1 text-xs font-black text-[#16222d]"
+                    >
+                      {learningGateOpen ? "閉じる" : "見る"}
+                    </button>
+                  </div>
+                  {learningGateOpen && learningPlan.primaryGate ? (
+                    <div className="mt-3 grid gap-2">
+                      <p className="font-bold text-white">{learningPlan.primaryGate.stageTitle}</p>
+                      <p>{learningPlan.primaryGate.unlockCue}</p>
+                      <p>{learningPlan.primaryGate.futureRequirementNote}</p>
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <Badge label={learningPlan.primaryGate.gateKind} />
+                        <Badge label={learningPlan.primaryGate.axis} />
+                        <Badge label={learningPlan.primaryGate.deviceRequirement} />
+                        {learningPlan.primaryGate.linkedSkillIds.map((skillId) => (
+                          <Badge key={skillId} label={skillId} />
+                        ))}
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="mt-3 text-[#b7c5ce]">agapat 側で要件が決まると、ここが route unlock の入口になる。</p>
+                  )}
+                </div>
+
+                <div className="rounded-[6px] border border-[#40505c] bg-[#0d1118] p-3">
+                  <p className="text-xs font-bold tracking-[0.18em] text-[#8aa0ad] uppercase">Skill Links</p>
+                  <div className="mt-3 grid gap-3">
+                    {learningPlan.worlds.map((world) => (
+                      <div key={world.worldId} className="rounded-[6px] border border-[#243341] bg-[#101820] p-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="font-bold text-white">{world.title}</p>
+                          <span className="text-xs font-bold tracking-[0.16em] text-[#8aa0ad] uppercase">{world.stageCount} stages</span>
+                        </div>
+                        <p className="mt-1 text-[#b7c5ce]">{world.curiosityCue}</p>
+                        <div className="mt-2 grid gap-2">
+                          {world.stagePlans.map((stage) => (
+                            <div key={stage.stageId} className="rounded-[6px] border border-[#394b39] bg-[#0d1118] p-2">
+                              <div className="flex flex-wrap items-start justify-between gap-2">
+                                <div>
+                                  <p className="font-bold text-white">{stage.stageTitle}</p>
+                                  <p className="text-xs text-[#b7c5ce]">{stage.stageSummary}</p>
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  <Badge label={stage.gateKind} />
+                                  <Badge label={stage.axis} />
+                                </div>
+                              </div>
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {stage.linkedSkillIds.length ? stage.linkedSkillIds.map((skillId) => <Badge key={skillId} label={skillId} />) : <Badge label="no linked skills yet" />}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid gap-1">
+                  <p>gate: {learningPlan.gatePalette.join(" / ")}</p>
+                  <p>next: {learningPlan.nextQuestTitle}</p>
+                  <p>{learningPlan.nextQuestSummary}</p>
+                </div>
+              </div>
+            </MessageWindow>
+          ) : null}
         </aside>
       </div>
+      {game.currentEnemy ? <BattleScreen enemy={game.currentEnemy} player={player} herbCount={herbCount} battleCue={game.battleCue} onAttack={attackEnemy} onFire={() => castSpell("fire")} onHeal={() => castSpell("heal")} onHerb={useHerb} onFlee={fleeBattle} /> : null}
+      {game.currentEnemy ? <BattleIntroOverlay active={battleIntroActive} step={battleIntroStep} enemyName={game.currentEnemy.name} /> : null}
     </main>
+  );
+}
+
+function Badge({ label }: { label: string }) {
+  return <span className="rounded-full border border-[#40505c] bg-[#101820] px-2 py-1 text-[11px] font-bold tracking-[0.08em] text-[#d7e0e8]">{label}</span>;
+}
+
+function BattleIntroOverlay({ active, step, enemyName }: { active: boolean; step: 0 | 1 | 2; enemyName: string }) {
+  return (
+    <div className={`pointer-events-none fixed inset-0 z-[60] grid place-items-center transition-opacity duration-200 ${active ? "opacity-100" : "opacity-0"}`}>
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(243,197,122,0.22),transparent_34%),linear-gradient(180deg,rgba(13,17,24,0.82),rgba(13,17,24,0.48))]" />
+      <div className="relative grid gap-3 text-center">
+        <div className={`mx-auto h-16 w-16 rounded-full border border-[#f3c57a]/70 bg-[#101820] shadow-[0_0_0_8px_rgba(243,197,122,0.08)] transition-all duration-200 ${step >= 1 ? "scale-100 opacity-100" : "scale-75 opacity-0"}`} />
+        <p className={`text-xs font-black tracking-[0.28em] text-[#f3c57a] transition-all duration-200 ${step >= 1 ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"}`}>ENCOUNTER</p>
+        <h2 className={`text-2xl font-black text-white transition-all duration-200 ${step >= 2 ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"}`}>{enemyName}</h2>
+      </div>
+    </div>
   );
 }
 
