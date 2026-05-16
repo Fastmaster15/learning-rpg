@@ -1,1192 +1,557 @@
-export const STORAGE_KEY = "learning-rpg.classic-loop.v2";
-export const TREASURE_CHEST_ID = "forest_chest_001";
-export const FIELD_WIDTH = 16;
-export const FIELD_HEIGHT = 12;
+export const STORAGE_KEY = "learning-rpg.card-exploration-mvp.v1";
 
-export type Screen = "title" | "town" | "field" | "battle" | "status";
-export type FieldId = "town_outskirts" | "grassland_road" | "forest_edge" | "forest_depth";
-export type InventoryItem = { itemId: string; count: number };
-export type Enemy = {
+export type SceneId = "asukamachi" | "artisan_workshop" | "temple_entrance";
+export type Screen = "title" | "play";
+export type CardId =
+  | "asukamachi"
+  | "asukagawa"
+  | "soga_umaiko"
+  | "asuka_workshop"
+  | "clay_tiles"
+  | "stone_carry"
+  | "stone_steps"
+  | "suiko"
+  | "shotoku"
+  | "asukadera";
+export type EventId = "town_story" | "workshop_story" | "temple_story";
+export type CardRank = "C" | "A" | "S";
+export type HotspotStatus = "unconfirmed" | "complete" | "locked";
+export type HotspotKind = "card" | "event" | "gate";
+
+export type CardReaction = {
+  line: string;
+  insightBonus: number;
+  bonusCardId?: CardId;
+};
+
+export type CardDefinition = {
+  id: CardId;
+  rank: CardRank;
+  title: string;
+  summary: string;
+  sceneId: SceneId;
+  insightValue: number;
+  eventWeights: Record<EventId, number>;
+  reactions: Record<EventId, CardReaction>;
+};
+
+export type SceneHotspot = {
   id: string;
-  name: string;
-  hp: number;
-  maxHp: number;
-  attack: number;
-  defense: number;
-  expReward: number;
-  goldReward: number;
-  area: "grassland" | "forest" | "forest_depth";
-  role: "weak" | "normal" | "strong" | "mini_boss";
-};
-
-export type Player = {
-  name: string;
-  level: number;
-  hp: number;
-  maxHp: number;
-  mp: number;
-  maxMp: number;
-  attack: number;
-  defense: number;
-  exp: number;
-  gold: number;
-  weaponId: string;
-  armorId: string;
-  items: InventoryItem[];
-};
-
-export type Position = { x: number; y: number };
-export type Equipment = {
-  id: string;
-  name: string;
-  type: "weapon" | "armor";
-  price: number;
-  attack?: number;
-  defense?: number;
-};
-
-export type FieldTile =
-  | "water"
-  | "shore"
-  | "grass"
-  | "road"
-  | "forest"
-  | "chest"
-  | "boss"
-  | "hill"
-  | "goal"
-  | "town"
-  | "gate"
-  | "blocked"
-  | "landmark";
-export type FieldTransition = {
-  toFieldId: FieldId;
-  toPosition: Position;
-  label: string;
-};
-
-export type FieldDefinition = {
-  fieldId: FieldId;
-  name: string;
-  townName: string;
-  description: string;
-  learningGateNote?: string;
-  width: number;
-  height: number;
-  encounterArea: "safe" | "grassland" | "forest" | "forest_depth";
-  entryPosition: Position;
-  map: FieldTile[][];
-  transitions: Record<string, FieldTransition>;
-};
-
-export type FieldPresentation = {
+  kind: HotspotKind;
+  title: string;
   subtitle: string;
-  moodLabel: string;
-  panelClassName: string;
-  gridShellClassName: string;
-  infoCardClassName: string;
-  infoTitleClassName: string;
-  badgeClassName: string;
+  x: number;
+  y: number;
+  cardId?: CardId;
+  eventId?: EventId;
+  requiresCardIds?: CardId[];
+};
+
+export type SceneDefinition = {
+  id: SceneId;
+  title: string;
+  subtitle: string;
+  summary: string;
+  accent: string;
+  shellClassName: string;
+  glowClassName: string;
+  hotspotIds: string[];
+};
+
+export type ActiveEvent = {
+  eventId: EventId;
+  sceneId: SceneId;
+  hotspotId: string;
+  cardIds: CardId[];
 };
 
 export type GameState = {
   started: boolean;
   screen: Screen;
-  previousScreen?: Screen | null;
-  fieldId: FieldId;
-  currentFieldId?: FieldId;
-  player: Player;
-  position: Position;
-  currentEnemy: Enemy | null;
-  battleCue?: BattleCue | null;
-  log: string[];
+  sceneId: SceneId;
+  focusHotspotId: string | null;
   dialogue: string;
-  steps: number;
-  objectiveCleared: boolean;
-  openedChestIds: string[];
-  miniBossDefeated: boolean;
+  log: string[];
+  ownedCardIds: CardId[];
+  completedHotspotIds: string[];
+  insightPoints: number;
+  sCardClaimed: boolean;
 };
 
-export type BattleCue = {
-  kind: "boss-attack";
-  special: boolean;
-  moveName?: string;
+export type CardBookProgress = {
+  ownedCount: number;
+  totalCount: number;
+  completionRate: number;
+  missingRequiredCardIds: CardId[];
+  gateReady: boolean;
 };
 
-export const levelTable = [
-  { level: 1, requiredExp: 0 },
-  { level: 2, requiredExp: 12 },
-  { level: 3, requiredExp: 32 },
-  { level: 4, requiredExp: 65 },
-  { level: 5, requiredExp: 110 }
+export const eventLibrary: Record<EventId, { title: string; prompt: string; successLine: string }> = {
+  town_story: {
+    title: "朝市の三択",
+    prompt: "町の輪郭を読むなら、どのカードを手元に出す？",
+    successLine: "町の空気が、歴史の地図に変わった。"
+  },
+  workshop_story: {
+    title: "作業場の三択",
+    prompt: "職人の視点で見るなら、どのカードを差し出す？",
+    successLine: "工房の音が、寺院の輪郭に重なった。"
+  },
+  temple_story: {
+    title: "寺の入口の三択",
+    prompt: "門前の意味を読むなら、どのカードを掲げる？",
+    successLine: "入口の空気が、寺の名前へつながった。"
+  }
+};
+
+export const requiredGateCardIds: CardId[] = [
+  "asukamachi",
+  "asukagawa",
+  "asuka_workshop",
+  "clay_tiles",
+  "suiko",
+  "shotoku"
 ];
 
-export const equipment: Record<string, Equipment> = {
-  wooden_sword: { id: "wooden_sword", name: "木の短剣", type: "weapon", price: 0, attack: 0 },
-  bronze_sword: { id: "bronze_sword", name: "青銅の剣", type: "weapon", price: 32, attack: 4 },
-  cloth_armor: { id: "cloth_armor", name: "旅人の服", type: "armor", price: 0, defense: 0 },
-  leather_armor: { id: "leather_armor", name: "革のよろい", type: "armor", price: 28, defense: 3 }
-};
-
-export const enemies: Enemy[] = [
+export const cardLibrary: CardDefinition[] = [
   {
-    id: "soft_blob",
-    name: "ぷるぷる",
-    hp: 10,
-    maxHp: 10,
-    attack: 4,
-    defense: 1,
-    expReward: 4,
-    goldReward: 6,
-    area: "grassland",
-    role: "weak"
+    id: "asukamachi",
+    rank: "C",
+    title: "飛鳥の町",
+    summary: "人が集まり、情報が行き来する章の起点。地名から景色を読み始めるための一枚。",
+    sceneId: "asukamachi",
+    insightValue: 1,
+    eventWeights: {
+      town_story: 5,
+      workshop_story: 1,
+      temple_story: 1
+    },
+    reactions: {
+      town_story: { line: "町の名前を押さえると、出来事が生活の手触りを持つ。", insightBonus: 1 },
+      workshop_story: { line: "町の輪郭が見えるほど、工房の役割も追いやすくなる。", insightBonus: 1 },
+      temple_story: { line: "寺の前に立つ前提として、まず町の位置が要る。", insightBonus: 1 }
+    }
   },
   {
-    id: "night_bat",
-    name: "よるこうもり",
-    hp: 16,
-    maxHp: 16,
-    attack: 6,
-    defense: 2,
-    expReward: 7,
-    goldReward: 10,
-    area: "grassland",
-    role: "normal"
+    id: "asukagawa",
+    rank: "C",
+    title: "飛鳥川",
+    summary: "道と人の流れを結ぶ、地形の手がかりになる川。ルートの読み解きに効く一枚。",
+    sceneId: "asukamachi",
+    insightValue: 1,
+    eventWeights: {
+      town_story: 5,
+      workshop_story: 1,
+      temple_story: 1
+    },
+    reactions: {
+      town_story: { line: "川の流れを見ると、町の外と内のつながりが見えてくる。", insightBonus: 1, bonusCardId: "soga_umaiko" },
+      workshop_story: { line: "運搬と水運を意識すると、工房の仕事が立体になる。", insightBonus: 1 },
+      temple_story: { line: "寺の前の地形は、川筋と切り離せない。", insightBonus: 1 }
+    }
   },
   {
-    id: "wild_boar",
-    name: "あばれイノシシ",
-    hp: 26,
-    maxHp: 26,
-    attack: 9,
-    defense: 3,
-    expReward: 12,
-    goldReward: 18,
-    area: "forest",
-    role: "strong"
+    id: "soga_umaiko",
+    rank: "A",
+    title: "蘇我馬子",
+    summary: "飛鳥期の政治を動かした人物の一人。寺院建立の背景をつかむための要点。",
+    sceneId: "asukamachi",
+    insightValue: 2,
+    eventWeights: {
+      town_story: 4,
+      workshop_story: 2,
+      temple_story: 3
+    },
+    reactions: {
+      town_story: { line: "政治の中心を出すと、町の意味が一気に厚くなる。", insightBonus: 2 },
+      workshop_story: { line: "工房の仕事は、権力の動きとつながっていたはずだ。", insightBonus: 1 },
+      temple_story: { line: "寺の建立を考えるなら、人物の名前は外せない。", insightBonus: 2 }
+    }
   },
   {
-    id: "forest_guardian",
-    name: "森のぬし",
-    hp: 45,
-    maxHp: 45,
-    attack: 10,
-    defense: 4,
-    expReward: 25,
-    goldReward: 40,
-    area: "forest_depth",
-    role: "mini_boss"
+    id: "asuka_workshop",
+    rank: "C",
+    title: "飛鳥の工房",
+    summary: "石と土と火が集まる現場。寺院の輪郭は、ここで少しずつ形になる。",
+    sceneId: "artisan_workshop",
+    insightValue: 1,
+    eventWeights: {
+      town_story: 1,
+      workshop_story: 5,
+      temple_story: 2
+    },
+    reactions: {
+      town_story: { line: "町の外れに工房があると、往来の理由が見えてくる。", insightBonus: 1 },
+      workshop_story: { line: "作業場の空気をつかめば、次のカードも集めやすい。", insightBonus: 1 },
+      temple_story: { line: "寺の前には、まずこうした現場の積み重ねがある。", insightBonus: 1 }
+    }
+  },
+  {
+    id: "clay_tiles",
+    rank: "C",
+    title: "瓦と土の仕事",
+    summary: "焼く・積む・支える。見た目の前に、寺を成り立たせる工程がある。",
+    sceneId: "artisan_workshop",
+    insightValue: 1,
+    eventWeights: {
+      town_story: 1,
+      workshop_story: 5,
+      temple_story: 2
+    },
+    reactions: {
+      town_story: { line: "素材の仕事を追うと、町の外に広がる技術が見える。", insightBonus: 1 },
+      workshop_story: { line: "瓦と土の段取りは、寺を現実にするための鍵だ。", insightBonus: 2, bonusCardId: "stone_carry" },
+      temple_story: { line: "門前で感じる重みは、こうした細かな工程の積み重ね。", insightBonus: 1 }
+    }
+  },
+  {
+    id: "stone_carry",
+    rank: "C",
+    title: "石材の運搬",
+    summary: "重い素材を動かすだけでも、街と工房と寺はつながる。副次的な補助カード。",
+    sceneId: "artisan_workshop",
+    insightValue: 1,
+    eventWeights: {
+      town_story: 1,
+      workshop_story: 4,
+      temple_story: 2
+    },
+    reactions: {
+      town_story: { line: "運ぶ仕事が見えると、町の外へ伸びる道も気になる。", insightBonus: 1 },
+      workshop_story: { line: "石を運ぶ力がなければ、寺の基礎は積めない。", insightBonus: 1 },
+      temple_story: { line: "寺の入口で重さを感じるのは、運搬の仕事があるからだ。", insightBonus: 1 }
+    }
+  },
+  {
+    id: "stone_steps",
+    rank: "C",
+    title: "石段の導き",
+    summary: "寺の入口へ近づく導線。門前の空気を先に伝える補助カード。",
+    sceneId: "temple_entrance",
+    insightValue: 1,
+    eventWeights: {
+      town_story: 1,
+      workshop_story: 2,
+      temple_story: 4
+    },
+    reactions: {
+      town_story: { line: "石段の話を出すと、町の外にある目的地が見えてくる。", insightBonus: 1 },
+      workshop_story: { line: "作業場の積み重ねが、石段の先にある寺へつながる。", insightBonus: 1 },
+      temple_story: { line: "入口の石段を押さえると、門前の空気が一段濃くなる。", insightBonus: 1 }
+    }
+  },
+  {
+    id: "suiko",
+    rank: "A",
+    title: "推古天皇",
+    summary: "飛鳥時代の政治を語る要の人物。寺院と制度の流れをつなぐカード。",
+    sceneId: "temple_entrance",
+    insightValue: 2,
+    eventWeights: {
+      town_story: 2,
+      workshop_story: 2,
+      temple_story: 5
+    },
+    reactions: {
+      town_story: { line: "人名が入ると、町の出来事は時代のうねりに変わる。", insightBonus: 1 },
+      workshop_story: { line: "制度の後ろ盾があれば、工房の仕事も寺へ届く。", insightBonus: 1 },
+      temple_story: { line: "寺の入口にこの名を置くと、建立の意味が立ち上がる。", insightBonus: 2 }
+    }
+  },
+  {
+    id: "shotoku",
+    rank: "A",
+    title: "厩戸皇子",
+    summary: "制度や思想の話に入りやすい人物。寺院の文脈で手がかりになる。",
+    sceneId: "temple_entrance",
+    insightValue: 2,
+    eventWeights: {
+      town_story: 2,
+      workshop_story: 2,
+      temple_story: 5
+    },
+    reactions: {
+      town_story: { line: "人物を押さえると、町の流れが単なる地名ではなくなる。", insightBonus: 1 },
+      workshop_story: { line: "工房の仕事も、思想の流れと無関係ではない。", insightBonus: 1 },
+      temple_story: { line: "寺の入口でこの人物を選ぶと、章の軸が定まる。", insightBonus: 2 }
+    }
+  },
+  {
+    id: "asukadera",
+    rank: "S",
+    title: "飛鳥寺",
+    summary: "条件を満たすと解放されるSランクカード。飛鳥の章を象徴する到達点。",
+    sceneId: "temple_entrance",
+    insightValue: 3,
+    eventWeights: {
+      town_story: 2,
+      workshop_story: 2,
+      temple_story: 6
+    },
+    reactions: {
+      town_story: { line: "最終地点の名前が見えると、町のすべてがそこへつながる。", insightBonus: 2 },
+      workshop_story: { line: "工房の積み重ねが、この寺の名前にまとまっていく。", insightBonus: 2 },
+      temple_story: { line: "入口を越えて到達した感覚が、Sランクの重みになる。", insightBonus: 3 }
+    }
   }
 ];
 
-const TOWN_OUTSKIRTS_FIELD_ID: FieldId = "town_outskirts";
-const GRASSLAND_ROAD_FIELD_ID: FieldId = "grassland_road";
-const FOREST_EDGE_FIELD_ID: FieldId = "forest_edge";
-const FOREST_DEPTH_FIELD_ID: FieldId = "forest_depth";
-
-function buildRow(tile: FieldTile) {
-  return Array.from({ length: FIELD_WIDTH }, () => tile);
-}
-
-function createFieldMap(base: FieldTile, placements: Array<{ x: number; y: number; tile: FieldTile }>) {
-  const map = Array.from({ length: FIELD_HEIGHT }, () => buildRow(base));
-  for (const placement of placements) {
-    map[placement.y][placement.x] = placement.tile;
-  }
-  return map;
-}
-
-function posKey(position: Position) {
-  return `${position.x},${position.y}`;
-}
-
-export const fields: Record<FieldId, FieldDefinition> = {
-  town_outskirts: {
-    fieldId: TOWN_OUTSKIRTS_FIELD_ID,
-    name: "町はずれの草原",
-    townName: "はじまりの町",
-    description: "町の安心感がまだ残る外縁。水辺と草地の向こうに、少しずつ旅立ちの道が見えてくる。",
-    width: FIELD_WIDTH,
-    height: FIELD_HEIGHT,
-    encounterArea: "safe",
-    entryPosition: { x: 3, y: 9 },
-    map: createFieldMap("grass", [
-      { x: 0, y: 0, tile: "water" },
-      { x: 1, y: 0, tile: "water" },
-      { x: 2, y: 0, tile: "shore" },
-      { x: 3, y: 0, tile: "shore" },
-      { x: 0, y: 1, tile: "water" },
-      { x: 1, y: 1, tile: "shore" },
-      { x: 6, y: 1, tile: "road" },
-      { x: 7, y: 1, tile: "road" },
-      { x: 8, y: 1, tile: "road" },
-      { x: 9, y: 1, tile: "road" },
-      { x: 10, y: 1, tile: "hill" },
-      { x: 11, y: 1, tile: "hill" },
-      { x: 14, y: 1, tile: "gate" },
-      { x: 15, y: 1, tile: "gate" },
-      { x: 4, y: 2, tile: "road" },
-      { x: 5, y: 2, tile: "road" },
-      { x: 6, y: 2, tile: "road" },
-      { x: 7, y: 2, tile: "grass" },
-      { x: 8, y: 2, tile: "grass" },
-      { x: 9, y: 2, tile: "grass" },
-      { x: 12, y: 2, tile: "hill" },
-      { x: 13, y: 2, tile: "hill" },
-      { x: 14, y: 2, tile: "gate" },
-      { x: 2, y: 3, tile: "road" },
-      { x: 3, y: 3, tile: "road" },
-      { x: 9, y: 3, tile: "hill" },
-      { x: 10, y: 3, tile: "hill" },
-      { x: 11, y: 3, tile: "forest" },
-      { x: 12, y: 3, tile: "forest" },
-      { x: 13, y: 3, tile: "forest" },
-      { x: 1, y: 4, tile: "road" },
-      { x: 2, y: 4, tile: "road" },
-      { x: 12, y: 4, tile: "forest" },
-      { x: 13, y: 4, tile: "forest" },
-      { x: 14, y: 4, tile: "forest" },
-      { x: 1, y: 5, tile: "road" },
-      { x: 2, y: 5, tile: "road" },
-      { x: 3, y: 5, tile: "road" },
-      { x: 4, y: 5, tile: "grass" },
-      { x: 5, y: 5, tile: "grass" },
-      { x: 6, y: 5, tile: "grass" },
-      { x: 2, y: 6, tile: "town" },
-      { x: 3, y: 6, tile: "road" },
-      { x: 4, y: 6, tile: "road" },
-      { x: 6, y: 6, tile: "chest" },
-      { x: 7, y: 6, tile: "road" },
-      { x: 8, y: 6, tile: "road" },
-      { x: 12, y: 6, tile: "forest" },
-      { x: 13, y: 6, tile: "forest" },
-      { x: 14, y: 6, tile: "forest" },
-      { x: 15, y: 6, tile: "forest" },
-      { x: 1, y: 7, tile: "road" },
-      { x: 2, y: 7, tile: "road" },
-      { x: 3, y: 7, tile: "grass" },
-      { x: 4, y: 7, tile: "grass" },
-      { x: 9, y: 7, tile: "hill" },
-      { x: 10, y: 7, tile: "hill" },
-      { x: 11, y: 7, tile: "hill" },
-      { x: 8, y: 8, tile: "road" },
-      { x: 9, y: 8, tile: "road" },
-      { x: 10, y: 8, tile: "grass" },
-      { x: 12, y: 8, tile: "grass" },
-      { x: 13, y: 8, tile: "grass" },
-      { x: 14, y: 8, tile: "grass" },
-      { x: 4, y: 9, tile: "hill" },
-      { x: 7, y: 9, tile: "road" },
-      { x: 8, y: 9, tile: "road" },
-      { x: 11, y: 9, tile: "grass" },
-      { x: 12, y: 9, tile: "grass" },
-      { x: 6, y: 10, tile: "road" },
-      { x: 7, y: 10, tile: "road" },
-      { x: 8, y: 10, tile: "grass" },
-      { x: 9, y: 10, tile: "grass" },
-      { x: 10, y: 10, tile: "grass" },
-      { x: 12, y: 10, tile: "grass" },
-      { x: 13, y: 10, tile: "grass" }
-    ]),
-    transitions: {
-      [posKey({ x: 14, y: 2 })]: {
-        toFieldId: GRASSLAND_ROAD_FIELD_ID,
-        toPosition: { x: 1, y: 5 },
-        label: "草原道へ"
-      },
-      [posKey({ x: 2, y: 6 })]: {
-        toFieldId: TOWN_OUTSKIRTS_FIELD_ID,
-        toPosition: { x: 3, y: 9 },
-        label: "町へ戻る"
-      }
-    }
+export const scenes: SceneDefinition[] = [
+  {
+    id: "asukamachi",
+    title: "飛鳥の町",
+    subtitle: "人と情報が集まる起点",
+    summary: "町の輪郭をつかむと、川と工房と寺の関係が見えてくる。まずは視点の出発点をつかむ。",
+    accent: "from-[#c28f61]/24 via-[#6a4e37]/18 to-[#1c242b]",
+    shellClassName: "border-[#7f5d42] bg-[linear-gradient(180deg,rgba(72,53,40,0.94)_0%,rgba(23,32,40,0.98)_100%)]",
+    glowClassName: "bg-[radial-gradient(circle_at_20%_10%,rgba(255,206,150,0.18),transparent_36%),radial-gradient(circle_at_78%_22%,rgba(180,224,255,0.12),transparent_30%),linear-gradient(180deg,rgba(23,32,40,0.12),rgba(23,32,40,0.6))]",
+    hotspotIds: ["town-river", "town-market", "town-event", "town-gate"]
   },
-  grassland_road: {
-    fieldId: GRASSLAND_ROAD_FIELD_ID,
-    name: "草原街道",
-    townName: "はじまりの町",
-    description: "見えているから進みたくなる街道。宝箱や曲がり道があり、先に森の入口が見える。",
-    learningGateNote: "街道の石碑は、まだ意味がつかめない。後で学びが進むと、この道の先の意味が分かりそうだ。",
-    width: FIELD_WIDTH,
-    height: FIELD_HEIGHT,
-    encounterArea: "grassland",
-    entryPosition: { x: 1, y: 5 },
-    map: createFieldMap("forest", [
-      { x: 0, y: 0, tile: "grass" },
-      { x: 1, y: 0, tile: "grass" },
-      { x: 2, y: 0, tile: "grass" },
-      { x: 3, y: 0, tile: "road" },
-      { x: 4, y: 0, tile: "road" },
-      { x: 8, y: 0, tile: "road" },
-      { x: 9, y: 0, tile: "road" },
-      { x: 10, y: 0, tile: "road" },
-      { x: 12, y: 0, tile: "grass" },
-      { x: 13, y: 0, tile: "grass" },
-      { x: 14, y: 0, tile: "grass" },
-      { x: 15, y: 0, tile: "grass" },
-      { x: 0, y: 1, tile: "grass" },
-      { x: 3, y: 1, tile: "road" },
-      { x: 4, y: 1, tile: "road" },
-      { x: 6, y: 1, tile: "grass" },
-      { x: 7, y: 1, tile: "grass" },
-      { x: 8, y: 1, tile: "road" },
-      { x: 9, y: 1, tile: "road" },
-      { x: 10, y: 1, tile: "road" },
-      { x: 11, y: 1, tile: "road" },
-      { x: 12, y: 1, tile: "hill" },
-      { x: 13, y: 1, tile: "hill" },
-      { x: 14, y: 1, tile: "hill" },
-      { x: 15, y: 1, tile: "hill" },
-      { x: 0, y: 2, tile: "gate" },
-      { x: 1, y: 2, tile: "road" },
-      { x: 2, y: 2, tile: "road" },
-      { x: 3, y: 2, tile: "road" },
-      { x: 7, y: 2, tile: "grass" },
-      { x: 8, y: 2, tile: "grass" },
-      { x: 9, y: 2, tile: "forest" },
-      { x: 10, y: 2, tile: "forest" },
-      { x: 11, y: 2, tile: "forest" },
-      { x: 12, y: 2, tile: "gate" },
-      { x: 13, y: 2, tile: "gate" },
-      { x: 14, y: 2, tile: "gate" },
-      { x: 15, y: 2, tile: "gate" },
-      { x: 1, y: 3, tile: "road" },
-      { x: 2, y: 3, tile: "grass" },
-      { x: 3, y: 3, tile: "grass" },
-      { x: 6, y: 3, tile: "forest" },
-      { x: 7, y: 3, tile: "forest" },
-      { x: 8, y: 3, tile: "forest" },
-      { x: 12, y: 3, tile: "forest" },
-      { x: 13, y: 3, tile: "forest" },
-      { x: 14, y: 3, tile: "forest" },
-      { x: 15, y: 3, tile: "forest" },
-      { x: 1, y: 4, tile: "grass" },
-      { x: 2, y: 4, tile: "grass" },
-      { x: 5, y: 4, tile: "forest" },
-      { x: 6, y: 4, tile: "forest" },
-      { x: 7, y: 4, tile: "forest" },
-      { x: 8, y: 4, tile: "forest" },
-      { x: 10, y: 4, tile: "grass" },
-      { x: 11, y: 4, tile: "grass" },
-      { x: 12, y: 4, tile: "forest" },
-      { x: 13, y: 4, tile: "forest" },
-      { x: 14, y: 4, tile: "forest" },
-      { x: 0, y: 5, tile: "gate" },
-      { x: 1, y: 5, tile: "road" },
-      { x: 2, y: 5, tile: "road" },
-      { x: 3, y: 5, tile: "road" },
-      { x: 4, y: 5, tile: "forest" },
-      { x: 5, y: 5, tile: "forest" },
-      { x: 6, y: 5, tile: "forest" },
-      { x: 7, y: 5, tile: "forest" },
-      { x: 8, y: 5, tile: "forest" },
-      { x: 9, y: 5, tile: "forest" },
-      { x: 10, y: 5, tile: "forest" },
-      { x: 11, y: 5, tile: "forest" },
-      { x: 12, y: 5, tile: "forest" },
-      { x: 13, y: 5, tile: "forest" },
-      { x: 14, y: 5, tile: "forest" },
-      { x: 15, y: 5, tile: "forest" },
-      { x: 3, y: 6, tile: "grass" },
-      { x: 4, y: 6, tile: "grass" },
-      { x: 5, y: 6, tile: "grass" },
-      { x: 6, y: 6, tile: "grass" },
-      { x: 7, y: 6, tile: "grass" },
-      { x: 8, y: 6, tile: "grass" },
-      { x: 9, y: 6, tile: "landmark" },
-      { x: 10, y: 6, tile: "forest" },
-      { x: 11, y: 6, tile: "road" },
-      { x: 12, y: 6, tile: "forest" },
-      { x: 13, y: 6, tile: "forest" },
-      { x: 14, y: 6, tile: "forest" },
-      { x: 15, y: 6, tile: "forest" },
-      { x: 2, y: 7, tile: "grass" },
-      { x: 3, y: 7, tile: "grass" },
-      { x: 4, y: 7, tile: "grass" },
-      { x: 5, y: 7, tile: "grass" },
-      { x: 6, y: 7, tile: "forest" },
-      { x: 7, y: 7, tile: "forest" },
-      { x: 8, y: 7, tile: "forest" },
-      { x: 9, y: 7, tile: "forest" },
-      { x: 12, y: 7, tile: "forest" },
-      { x: 13, y: 7, tile: "forest" },
-      { x: 14, y: 7, tile: "forest" },
-      { x: 15, y: 7, tile: "forest" },
-      { x: 4, y: 8, tile: "grass" },
-      { x: 5, y: 8, tile: "grass" },
-      { x: 6, y: 8, tile: "grass" },
-      { x: 7, y: 8, tile: "road" },
-      { x: 8, y: 8, tile: "road" },
-      { x: 9, y: 8, tile: "road" },
-      { x: 10, y: 8, tile: "grass" },
-      { x: 11, y: 8, tile: "forest" },
-      { x: 12, y: 8, tile: "forest" },
-      { x: 13, y: 8, tile: "forest" },
-      { x: 6, y: 9, tile: "chest" },
-      { x: 7, y: 9, tile: "road" },
-      { x: 8, y: 9, tile: "road" },
-      { x: 9, y: 9, tile: "road" },
-      { x: 10, y: 9, tile: "grass" },
-      { x: 11, y: 9, tile: "forest" },
-      { x: 12, y: 9, tile: "forest" },
-      { x: 13, y: 9, tile: "forest" },
-      { x: 14, y: 9, tile: "forest" },
-      { x: 3, y: 10, tile: "grass" },
-      { x: 4, y: 10, tile: "grass" },
-      { x: 5, y: 10, tile: "grass" },
-      { x: 6, y: 10, tile: "grass" },
-      { x: 7, y: 10, tile: "road" },
-      { x: 8, y: 10, tile: "road" },
-      { x: 9, y: 10, tile: "grass" },
-      { x: 10, y: 10, tile: "grass" },
-      { x: 11, y: 10, tile: "grass" },
-      { x: 12, y: 10, tile: "grass" },
-      { x: 13, y: 10, tile: "grass" }
-    ]),
-    transitions: {
-      [posKey({ x: 0, y: 5 })]: {
-        toFieldId: TOWN_OUTSKIRTS_FIELD_ID,
-        toPosition: { x: 13, y: 2 },
-        label: "町外れへ"
-      },
-      [posKey({ x: 15, y: 2 })]: {
-        toFieldId: FOREST_EDGE_FIELD_ID,
-        toPosition: { x: 0, y: 5 },
-        label: "森の入口へ"
-      }
-    }
+  {
+    id: "artisan_workshop",
+    title: "職人の作業場",
+    subtitle: "石と土の音がする場所",
+    summary: "寺の輪郭を支えるのは、名前よりも先にある工程だ。作る手つきを見れば、時代の輪郭が見える。",
+    accent: "from-[#9f7f51]/24 via-[#45513c]/18 to-[#1b2428]",
+    shellClassName: "border-[#6f7d57] bg-[linear-gradient(180deg,rgba(47,58,44,0.95)_0%,rgba(20,30,36,0.98)_100%)]",
+    glowClassName: "bg-[radial-gradient(circle_at_18%_16%,rgba(204,233,156,0.16),transparent_35%),radial-gradient(circle_at_76%_18%,rgba(226,191,146,0.12),transparent_32%),linear-gradient(180deg,rgba(23,34,30,0.14),rgba(20,30,36,0.66))]",
+    hotspotIds: ["workshop-bench", "workshop-clay", "workshop-event", "workshop-stones"]
   },
-  forest_edge: {
-    fieldId: FOREST_EDGE_FIELD_ID,
-    name: "森の入口",
-    townName: "はじまりの町",
-    description: "木々が濃くなり、少し先は見えるのに気になる。まだ通れない知識の門と、奥へ続く道の予感がある。",
-    learningGateNote: "森の入口には古い石碑と、まだ通れない脇道がある。理解が進めば先へ行けそうだ。",
-    width: FIELD_WIDTH,
-    height: FIELD_HEIGHT,
-    encounterArea: "forest",
-    entryPosition: { x: 0, y: 5 },
-    map: createFieldMap("hill", [
-      { x: 0, y: 0, tile: "grass" },
-      { x: 1, y: 0, tile: "grass" },
-      { x: 2, y: 0, tile: "road" },
-      { x: 3, y: 0, tile: "road" },
-      { x: 4, y: 0, tile: "road" },
-      { x: 11, y: 0, tile: "gate" },
-      { x: 12, y: 0, tile: "gate" },
-      { x: 13, y: 0, tile: "gate" },
-      { x: 14, y: 0, tile: "grass" },
-      { x: 15, y: 0, tile: "grass" },
-      { x: 1, y: 1, tile: "road" },
-      { x: 2, y: 1, tile: "road" },
-      { x: 3, y: 1, tile: "grass" },
-      { x: 4, y: 1, tile: "grass" },
-      { x: 8, y: 1, tile: "forest" },
-      { x: 9, y: 1, tile: "forest" },
-      { x: 10, y: 1, tile: "forest" },
-      { x: 11, y: 1, tile: "forest" },
-      { x: 12, y: 1, tile: "forest" },
-      { x: 13, y: 1, tile: "grass" },
-      { x: 14, y: 1, tile: "grass" },
-      { x: 15, y: 1, tile: "grass" },
-      { x: 2, y: 2, tile: "road" },
-      { x: 3, y: 2, tile: "road" },
-      { x: 4, y: 2, tile: "grass" },
-      { x: 5, y: 2, tile: "grass" },
-      { x: 7, y: 2, tile: "forest" },
-      { x: 8, y: 2, tile: "forest" },
-      { x: 9, y: 2, tile: "forest" },
-      { x: 10, y: 2, tile: "forest" },
-      { x: 11, y: 2, tile: "forest" },
-      { x: 12, y: 2, tile: "forest" },
-      { x: 13, y: 2, tile: "grass" },
-      { x: 14, y: 2, tile: "grass" },
-      { x: 15, y: 2, tile: "grass" },
-      { x: 1, y: 3, tile: "grass" },
-      { x: 2, y: 3, tile: "grass" },
-      { x: 3, y: 3, tile: "road" },
-      { x: 4, y: 3, tile: "road" },
-      { x: 5, y: 3, tile: "grass" },
-      { x: 6, y: 3, tile: "forest" },
-      { x: 7, y: 3, tile: "forest" },
-      { x: 8, y: 3, tile: "forest" },
-      { x: 12, y: 3, tile: "forest" },
-      { x: 13, y: 3, tile: "forest" },
-      { x: 14, y: 3, tile: "blocked" },
-      { x: 15, y: 3, tile: "forest" },
-      { x: 0, y: 4, tile: "grass" },
-      { x: 1, y: 4, tile: "grass" },
-      { x: 2, y: 4, tile: "grass" },
-      { x: 4, y: 4, tile: "grass" },
-      { x: 5, y: 4, tile: "grass" },
-      { x: 6, y: 4, tile: "forest" },
-      { x: 7, y: 4, tile: "forest" },
-      { x: 8, y: 4, tile: "forest" },
-      { x: 9, y: 4, tile: "forest" },
-      { x: 12, y: 4, tile: "forest" },
-      { x: 13, y: 4, tile: "forest" },
-      { x: 14, y: 4, tile: "forest" },
-      { x: 15, y: 4, tile: "forest" },
-      { x: 0, y: 5, tile: "gate" },
-      { x: 1, y: 5, tile: "road" },
-      { x: 2, y: 5, tile: "road" },
-      { x: 3, y: 5, tile: "road" },
-      { x: 4, y: 5, tile: "forest" },
-      { x: 5, y: 5, tile: "forest" },
-      { x: 6, y: 5, tile: "forest" },
-      { x: 7, y: 5, tile: "forest" },
-      { x: 8, y: 5, tile: "forest" },
-      { x: 9, y: 5, tile: "forest" },
-      { x: 10, y: 5, tile: "forest" },
-      { x: 11, y: 5, tile: "forest" },
-      { x: 12, y: 5, tile: "forest" },
-      { x: 13, y: 5, tile: "forest" },
-      { x: 14, y: 5, tile: "forest" },
-      { x: 15, y: 5, tile: "forest" },
-      { x: 2, y: 6, tile: "road" },
-      { x: 3, y: 6, tile: "road" },
-      { x: 4, y: 6, tile: "road" },
-      { x: 5, y: 6, tile: "road" },
-      { x: 6, y: 6, tile: "grass" },
-      { x: 7, y: 6, tile: "grass" },
-      { x: 8, y: 6, tile: "grass" },
-      { x: 9, y: 6, tile: "forest" },
-      { x: 10, y: 6, tile: "forest" },
-      { x: 11, y: 6, tile: "forest" },
-      { x: 12, y: 6, tile: "forest" },
-      { x: 13, y: 6, tile: "forest" },
-      { x: 14, y: 6, tile: "forest" },
-      { x: 15, y: 6, tile: "forest" },
-      { x: 2, y: 7, tile: "grass" },
-      { x: 3, y: 7, tile: "grass" },
-      { x: 4, y: 7, tile: "grass" },
-      { x: 5, y: 7, tile: "road" },
-      { x: 6, y: 7, tile: "road" },
-      { x: 7, y: 7, tile: "road" },
-      { x: 8, y: 7, tile: "grass" },
-      { x: 9, y: 7, tile: "grass" },
-      { x: 10, y: 7, tile: "forest" },
-      { x: 11, y: 7, tile: "forest" },
-      { x: 12, y: 7, tile: "forest" },
-      { x: 13, y: 7, tile: "forest" },
-      { x: 14, y: 7, tile: "forest" },
-      { x: 15, y: 7, tile: "forest" },
-      { x: 4, y: 8, tile: "road" },
-      { x: 5, y: 8, tile: "road" },
-      { x: 6, y: 8, tile: "road" },
-      { x: 7, y: 8, tile: "road" },
-      { x: 8, y: 8, tile: "road" },
-      { x: 9, y: 8, tile: "road" },
-      { x: 10, y: 8, tile: "road" },
-      { x: 11, y: 8, tile: "road" },
-      { x: 12, y: 8, tile: "road" },
-      { x: 13, y: 8, tile: "grass" },
-      { x: 14, y: 8, tile: "grass" },
-      { x: 15, y: 8, tile: "grass" },
-      { x: 3, y: 9, tile: "grass" },
-      { x: 4, y: 9, tile: "grass" },
-      { x: 5, y: 9, tile: "grass" },
-      { x: 6, y: 9, tile: "road" },
-      { x: 7, y: 9, tile: "road" },
-      { x: 8, y: 9, tile: "road" },
-      { x: 9, y: 9, tile: "road" },
-      { x: 10, y: 9, tile: "road" },
-      { x: 11, y: 9, tile: "grass" },
-      { x: 12, y: 9, tile: "grass" },
-      { x: 13, y: 9, tile: "grass" },
-      { x: 14, y: 9, tile: "grass" },
-      { x: 15, y: 9, tile: "grass" },
-      { x: 2, y: 10, tile: "road" },
-      { x: 3, y: 10, tile: "road" },
-      { x: 4, y: 10, tile: "grass" },
-      { x: 5, y: 10, tile: "grass" },
-      { x: 6, y: 10, tile: "grass" },
-      { x: 7, y: 10, tile: "grass" },
-      { x: 8, y: 10, tile: "grass" },
-      { x: 9, y: 10, tile: "grass" },
-      { x: 10, y: 10, tile: "grass" },
-      { x: 11, y: 10, tile: "grass" },
-      { x: 12, y: 10, tile: "grass" },
-      { x: 13, y: 10, tile: "grass" },
-      { x: 14, y: 10, tile: "grass" },
-      { x: 15, y: 10, tile: "grass" },
-      { x: 2, y: 11, tile: "gate" },
-      { x: 3, y: 11, tile: "gate" },
-      { x: 4, y: 11, tile: "gate" },
-      { x: 5, y: 11, tile: "gate" },
-      { x: 6, y: 11, tile: "grass" },
-      { x: 7, y: 11, tile: "grass" },
-      { x: 8, y: 11, tile: "grass" },
-      { x: 9, y: 11, tile: "grass" },
-      { x: 10, y: 11, tile: "grass" },
-      { x: 11, y: 11, tile: "grass" },
-      { x: 12, y: 11, tile: "grass" },
-      { x: 13, y: 11, tile: "grass" },
-      { x: 14, y: 11, tile: "grass" },
-      { x: 15, y: 11, tile: "grass" }
-    ]),
-    transitions: {
-      [posKey({ x: 0, y: 5 })]: {
-        toFieldId: GRASSLAND_ROAD_FIELD_ID,
-        toPosition: { x: 14, y: 2 },
-        label: "街道へ"
-      },
-      [posKey({ x: 11, y: 0 })]: {
-        toFieldId: FOREST_DEPTH_FIELD_ID,
-        toPosition: { x: 2, y: 10 },
-        label: "知識の門"
-      }
-    }
+  {
+    id: "temple_entrance",
+    title: "寺の入口",
+    subtitle: "Sカードへ続く門前",
+    summary: "ここで必要なカードと視点がそろうと、飛鳥寺のカードが解放される。",
+    accent: "from-[#7f89ac]/22 via-[#3e4a67]/18 to-[#141b2a]",
+    shellClassName: "border-[#56688a] bg-[linear-gradient(180deg,rgba(35,43,66,0.95)_0%,rgba(17,22,34,0.98)_100%)]",
+    glowClassName: "bg-[radial-gradient(circle_at_22%_18%,rgba(180,204,255,0.17),transparent_34%),radial-gradient(circle_at_74%_18%,rgba(255,233,176,0.12),transparent_30%),linear-gradient(180deg,rgba(18,24,38,0.12),rgba(17,22,34,0.7))]",
+    hotspotIds: ["temple-promenade", "temple-royalty", "temple-event", "temple-gate"]
+  }
+];
+
+export const sceneById = Object.fromEntries(scenes.map((scene) => [scene.id, scene])) as Record<SceneId, SceneDefinition>;
+
+export const hotspotById = {
+  "town-river": {
+    id: "town-river",
+    kind: "card",
+    title: "川面の泡",
+    subtitle: "飛鳥川の流れを拾う",
+    x: 20,
+    y: 67,
+    cardId: "asukagawa"
   },
-  forest_depth: {
-    fieldId: FOREST_DEPTH_FIELD_ID,
-    name: "森の深部",
-    townName: "はじまりの町",
-    description: "最深部の張りつめた空気。学ぶと道が開く、知識の門の先に章の終点がある。",
-    learningGateNote: "森の深部では、光の前に意味の分からない門がある。今はまだ通れない。",
-    width: FIELD_WIDTH,
-    height: FIELD_HEIGHT,
-    encounterArea: "forest_depth",
-    entryPosition: { x: 2, y: 10 },
-    map: createFieldMap("hill", [
-      { x: 0, y: 0, tile: "grass" },
-      { x: 1, y: 0, tile: "grass" },
-      { x: 2, y: 0, tile: "road" },
-      { x: 3, y: 0, tile: "road" },
-      { x: 4, y: 0, tile: "road" },
-      { x: 10, y: 0, tile: "gate" },
-      { x: 11, y: 0, tile: "gate" },
-      { x: 12, y: 0, tile: "gate" },
-      { x: 13, y: 0, tile: "gate" },
-      { x: 14, y: 0, tile: "grass" },
-      { x: 15, y: 0, tile: "grass" },
-      { x: 1, y: 1, tile: "road" },
-      { x: 2, y: 1, tile: "road" },
-      { x: 3, y: 1, tile: "road" },
-      { x: 8, y: 1, tile: "forest" },
-      { x: 9, y: 1, tile: "forest" },
-      { x: 10, y: 1, tile: "forest" },
-      { x: 11, y: 1, tile: "forest" },
-      { x: 12, y: 1, tile: "forest" },
-      { x: 13, y: 1, tile: "grass" },
-      { x: 14, y: 1, tile: "grass" },
-      { x: 15, y: 1, tile: "grass" },
-      { x: 2, y: 2, tile: "road" },
-      { x: 3, y: 2, tile: "road" },
-      { x: 4, y: 2, tile: "grass" },
-      { x: 8, y: 2, tile: "hill" },
-      { x: 9, y: 2, tile: "hill" },
-      { x: 10, y: 2, tile: "hill" },
-      { x: 11, y: 2, tile: "hill" },
-      { x: 12, y: 2, tile: "road" },
-      { x: 13, y: 2, tile: "road" },
-      { x: 14, y: 2, tile: "road" },
-      { x: 15, y: 2, tile: "road" },
-      { x: 1, y: 3, tile: "grass" },
-      { x: 2, y: 3, tile: "road" },
-      { x: 3, y: 3, tile: "road" },
-      { x: 4, y: 3, tile: "grass" },
-      { x: 8, y: 3, tile: "hill" },
-      { x: 9, y: 3, tile: "hill" },
-      { x: 10, y: 3, tile: "hill" },
-      { x: 11, y: 3, tile: "hill" },
-      { x: 13, y: 3, tile: "grass" },
-      { x: 14, y: 3, tile: "grass" },
-      { x: 15, y: 3, tile: "grass" },
-      { x: 0, y: 4, tile: "grass" },
-      { x: 1, y: 4, tile: "grass" },
-      { x: 2, y: 4, tile: "grass" },
-      { x: 4, y: 4, tile: "grass" },
-      { x: 5, y: 4, tile: "grass" },
-      { x: 6, y: 4, tile: "road" },
-      { x: 7, y: 4, tile: "road" },
-      { x: 8, y: 4, tile: "road" },
-      { x: 9, y: 4, tile: "road" },
-      { x: 12, y: 4, tile: "grass" },
-      { x: 13, y: 4, tile: "grass" },
-      { x: 14, y: 4, tile: "grass" },
-      { x: 15, y: 4, tile: "grass" },
-      { x: 2, y: 5, tile: "grass" },
-      { x: 3, y: 5, tile: "grass" },
-      { x: 4, y: 5, tile: "grass" },
-      { x: 5, y: 5, tile: "road" },
-      { x: 6, y: 5, tile: "road" },
-      { x: 7, y: 5, tile: "road" },
-      { x: 8, y: 5, tile: "grass" },
-      { x: 9, y: 5, tile: "grass" },
-      { x: 10, y: 5, tile: "grass" },
-      { x: 11, y: 5, tile: "grass" },
-      { x: 12, y: 5, tile: "grass" },
-      { x: 13, y: 5, tile: "grass" },
-      { x: 14, y: 5, tile: "grass" },
-      { x: 15, y: 5, tile: "grass" },
-      { x: 1, y: 6, tile: "road" },
-      { x: 2, y: 6, tile: "road" },
-      { x: 3, y: 6, tile: "road" },
-      { x: 4, y: 6, tile: "road" },
-      { x: 5, y: 6, tile: "road" },
-      { x: 6, y: 6, tile: "chest" },
-      { x: 7, y: 6, tile: "road" },
-      { x: 8, y: 6, tile: "road" },
-      { x: 10, y: 6, tile: "grass" },
-      { x: 11, y: 6, tile: "grass" },
-      { x: 12, y: 6, tile: "grass" },
-      { x: 13, y: 6, tile: "grass" },
-      { x: 14, y: 6, tile: "grass" },
-      { x: 15, y: 6, tile: "grass" },
-      { x: 1, y: 7, tile: "grass" },
-      { x: 2, y: 7, tile: "grass" },
-      { x: 3, y: 7, tile: "grass" },
-      { x: 4, y: 7, tile: "road" },
-      { x: 5, y: 7, tile: "road" },
-      { x: 6, y: 7, tile: "road" },
-      { x: 7, y: 7, tile: "road" },
-      { x: 8, y: 7, tile: "grass" },
-      { x: 9, y: 7, tile: "grass" },
-      { x: 10, y: 7, tile: "grass" },
-      { x: 11, y: 7, tile: "grass" },
-      { x: 12, y: 7, tile: "grass" },
-      { x: 13, y: 7, tile: "grass" },
-      { x: 14, y: 7, tile: "grass" },
-      { x: 15, y: 7, tile: "grass" },
-      { x: 4, y: 8, tile: "road" },
-      { x: 5, y: 8, tile: "road" },
-      { x: 6, y: 8, tile: "road" },
-      { x: 7, y: 8, tile: "road" },
-      { x: 8, y: 8, tile: "road" },
-      { x: 9, y: 8, tile: "road" },
-      { x: 10, y: 8, tile: "road" },
-      { x: 11, y: 8, tile: "road" },
-      { x: 12, y: 8, tile: "boss" },
-      { x: 13, y: 8, tile: "goal" },
-      { x: 14, y: 8, tile: "grass" },
-      { x: 15, y: 8, tile: "grass" },
-      { x: 3, y: 9, tile: "grass" },
-      { x: 4, y: 9, tile: "grass" },
-      { x: 5, y: 9, tile: "grass" },
-      { x: 6, y: 9, tile: "road" },
-      { x: 7, y: 9, tile: "road" },
-      { x: 8, y: 9, tile: "road" },
-      { x: 9, y: 9, tile: "road" },
-      { x: 10, y: 9, tile: "road" },
-      { x: 11, y: 9, tile: "grass" },
-      { x: 12, y: 9, tile: "grass" },
-      { x: 13, y: 9, tile: "grass" },
-      { x: 14, y: 9, tile: "grass" },
-      { x: 15, y: 9, tile: "grass" },
-      { x: 2, y: 10, tile: "road" },
-      { x: 3, y: 10, tile: "road" },
-      { x: 4, y: 10, tile: "grass" },
-      { x: 5, y: 10, tile: "grass" },
-      { x: 6, y: 10, tile: "grass" },
-      { x: 7, y: 10, tile: "grass" },
-      { x: 8, y: 10, tile: "grass" },
-      { x: 9, y: 10, tile: "grass" },
-      { x: 10, y: 10, tile: "grass" },
-      { x: 11, y: 10, tile: "grass" },
-      { x: 12, y: 10, tile: "grass" },
-      { x: 13, y: 10, tile: "grass" },
-      { x: 14, y: 10, tile: "grass" },
-      { x: 15, y: 10, tile: "grass" },
-      { x: 2, y: 11, tile: "gate" },
-      { x: 3, y: 11, tile: "gate" },
-      { x: 4, y: 11, tile: "gate" },
-      { x: 5, y: 11, tile: "gate" },
-      { x: 6, y: 11, tile: "grass" },
-      { x: 7, y: 11, tile: "grass" },
-      { x: 8, y: 11, tile: "grass" },
-      { x: 9, y: 11, tile: "grass" },
-      { x: 10, y: 11, tile: "grass" },
-      { x: 11, y: 11, tile: "grass" },
-      { x: 12, y: 11, tile: "grass" },
-      { x: 13, y: 11, tile: "grass" },
-      { x: 14, y: 11, tile: "grass" },
-      { x: 15, y: 11, tile: "grass" }
-    ]),
-    transitions: {
-      [posKey({ x: 2, y: 11 })]: {
-        toFieldId: FOREST_EDGE_FIELD_ID,
-        toPosition: { x: 13, y: 0 },
-        label: "森へ戻る"
-      }
-    }
+  "town-market": {
+    id: "town-market",
+    kind: "card",
+    title: "町札の輪郭",
+    subtitle: "飛鳥の町を手に入れる",
+    x: 48,
+    y: 42,
+    cardId: "asukamachi"
+  },
+  "town-event": {
+    id: "town-event",
+    kind: "event",
+    title: "朝市の問い",
+    subtitle: "3択カードイベント",
+    x: 76,
+    y: 57,
+    eventId: "town_story"
+  },
+  "town-gate": {
+    id: "town-gate",
+    kind: "gate",
+    title: "寺への気配",
+    subtitle: "条件達成でS解放",
+    x: 84,
+    y: 80,
+    cardId: "asukadera",
+    requiresCardIds: requiredGateCardIds
+  },
+  "workshop-bench": {
+    id: "workshop-bench",
+    kind: "card",
+    title: "作業台の木目",
+    subtitle: "飛鳥の工房を拾う",
+    x: 24,
+    y: 60,
+    cardId: "asuka_workshop"
+  },
+  "workshop-clay": {
+    id: "workshop-clay",
+    kind: "card",
+    title: "土と瓦",
+    subtitle: "瓦と土の仕事を拾う",
+    x: 55,
+    y: 38,
+    cardId: "clay_tiles"
+  },
+  "workshop-event": {
+    id: "workshop-event",
+    kind: "event",
+    title: "工房の問い",
+    subtitle: "3択カードイベント",
+    x: 76,
+    y: 63,
+    eventId: "workshop_story"
+  },
+  "workshop-stones": {
+    id: "workshop-stones",
+    kind: "card",
+    title: "石の荷",
+    subtitle: "石材の運搬を拾う",
+    x: 42,
+    y: 82,
+    cardId: "stone_carry"
+  },
+  "temple-promenade": {
+    id: "temple-promenade",
+    kind: "card",
+    title: "石段の手前",
+    subtitle: "寺の入口の空気を拾う",
+    x: 27,
+    y: 61,
+    cardId: "stone_steps"
+  },
+  "temple-royalty": {
+    id: "temple-royalty",
+    kind: "card",
+    title: "朝廷の気配",
+    subtitle: "推古天皇を拾う",
+    x: 58,
+    y: 39,
+    cardId: "suiko"
+  },
+  "temple-event": {
+    id: "temple-event",
+    kind: "event",
+    title: "門前の問い",
+    subtitle: "3択カードイベント",
+    x: 76,
+    y: 57,
+    eventId: "temple_story"
+  },
+  "temple-gate": {
+    id: "temple-gate",
+    kind: "gate",
+    title: "飛鳥寺の門",
+    subtitle: "Sランク解放",
+    x: 84,
+    y: 80,
+    cardId: "asukadera",
+    requiresCardIds: requiredGateCardIds
   }
-};
+} as const satisfies Record<string, SceneHotspot>;
 
-export function getFieldPresentation(fieldId: FieldId): FieldPresentation {
-  if (fieldId === "town_outskirts") {
-    return {
-      subtitle: "町の安心感が残る外縁",
-      moodLabel: "町の外だけど、まだ安全",
-      panelClassName: "bg-[linear-gradient(180deg,#22352c_0%,#101820_100%)]",
-      gridShellClassName: "border-[#5c7d5f] bg-[radial-gradient(circle_at_top,#385246_0%,#17251f_44%,#101820_100%)]",
-      infoCardClassName: "border-[#5c7d5f] bg-[#101820]",
-      infoTitleClassName: "text-[#cfe5cf]",
-      badgeClassName: "border-[#91bd74] bg-[#193120] text-[#dff6d8]"
-    };
-  }
-
-  if (fieldId === "grassland_road") {
-    return {
-      subtitle: "見えているから進みたくなる街道",
-      moodLabel: "先が見える導線",
-      panelClassName: "bg-[linear-gradient(180deg,#27351e_0%,#101820_100%)]",
-      gridShellClassName: "border-[#7e9762] bg-[radial-gradient(circle_at_top,#425135_0%,#1b2616_46%,#101820_100%)]",
-      infoCardClassName: "border-[#7e9762] bg-[#101820]",
-      infoTitleClassName: "text-[#dfe8cf]",
-      badgeClassName: "border-[#d8c48d] bg-[#312b18] text-[#f7e7b8]"
-    };
-  }
-
-  if (fieldId === "forest_edge") {
-    return {
-      subtitle: "見えているのに気になる森の入口",
-      moodLabel: "気になる地形が増える",
-      panelClassName: "bg-[linear-gradient(180deg,#183021_0%,#101820_100%)]",
-      gridShellClassName: "border-[#4f7856] bg-[radial-gradient(circle_at_top,#27402d_0%,#152018_48%,#101820_100%)]",
-      infoCardClassName: "border-[#4f7856] bg-[#101820]",
-      infoTitleClassName: "text-[#c7e2cf]",
-      badgeClassName: "border-[#8de0b1] bg-[#173322] text-[#dbffe9]"
-    };
-  }
-
-  return {
-    subtitle: "学ぶと道が開く終盤の気配",
-    moodLabel: "知識の門が見える",
-    panelClassName: "bg-[linear-gradient(180deg,#1b2535_0%,#101820_100%)]",
-    gridShellClassName: "border-[#51627a] bg-[radial-gradient(circle_at_top,#24334a_0%,#151f2f_47%,#101820_100%)]",
-    infoCardClassName: "border-[#51627a] bg-[#101820]",
-    infoTitleClassName: "text-[#d6deea]",
-    badgeClassName: "border-[#8db8ff] bg-[#182338] text-[#dbe7ff]"
-  };
-}
-
-export const fieldOrder: FieldId[] = [TOWN_OUTSKIRTS_FIELD_ID, GRASSLAND_ROAD_FIELD_ID, FOREST_EDGE_FIELD_ID, FOREST_DEPTH_FIELD_ID];
-
-export const initialPlayer: Player = {
-  name: "Hero",
-  level: 1,
-  hp: 24,
-  maxHp: 24,
-  mp: 6,
-  maxMp: 6,
-  attack: 7,
-  defense: 4,
-  exp: 0,
-  gold: 30,
-  weaponId: "wooden_sword",
-  armorId: "cloth_armor",
-  items: [{ itemId: "herb", count: 2 }]
+export const sceneHotspots: Record<SceneId, SceneHotspot[]> = {
+  asukamachi: [hotspotById["town-river"], hotspotById["town-market"], hotspotById["town-event"], hotspotById["town-gate"]],
+  artisan_workshop: [hotspotById["workshop-bench"], hotspotById["workshop-clay"], hotspotById["workshop-event"], hotspotById["workshop-stones"]],
+  temple_entrance: [hotspotById["temple-promenade"], hotspotById["temple-royalty"], hotspotById["temple-event"], hotspotById["temple-gate"]]
 };
 
 export const initialGameState: GameState = {
   started: false,
   screen: "title",
-  previousScreen: "town",
-  fieldId: TOWN_OUTSKIRTS_FIELD_ID,
-  currentFieldId: TOWN_OUTSKIRTS_FIELD_ID,
-  player: initialPlayer,
-  position: fields[TOWN_OUTSKIRTS_FIELD_ID].entryPosition,
-  currentEnemy: null,
-  battleCue: null,
-  log: ["旅の準備ができた。"],
-  dialogue: "町の人に話しかけて、北の森へ向かう目的を聞こう。",
-  steps: 0,
-  objectiveCleared: false,
-  openedChestIds: [],
-  miniBossDefeated: false
+  sceneId: "asukamachi",
+  focusHotspotId: null,
+  dialogue: "飛鳥の町から、カード探索を始めよう。",
+  log: ["飛鳥の章の準備が整った。"],
+  ownedCardIds: [],
+  completedHotspotIds: [],
+  insightPoints: 0,
+  sCardClaimed: false
 };
 
-export function getItemCount(player: Player, itemId: string) {
-  return player.items.find((item) => item.itemId === itemId)?.count ?? 0;
+function rankWeight(rank: CardRank) {
+  return rank === "S" ? 3 : rank === "A" ? 2 : 1;
 }
 
-export function addItem(player: Player, itemId: string, count: number): Player {
-  const exists = player.items.some((item) => item.itemId === itemId);
+export function getScene(sceneId: SceneId) {
+  return sceneById[sceneId];
+}
+
+export function getHotspots(sceneId: SceneId) {
+  return sceneHotspots[sceneId];
+}
+
+export function getCard(cardId: CardId) {
+  return cardLibrary.find((card) => card.id === cardId) ?? cardLibrary[0];
+}
+
+export function isCardOwned(state: Pick<GameState, "ownedCardIds">, cardId: CardId) {
+  return state.ownedCardIds.includes(cardId);
+}
+
+export function getOwnedCards(state: Pick<GameState, "ownedCardIds">) {
+  return cardLibrary.filter((card) => state.ownedCardIds.includes(card.id));
+}
+
+export function getRequiredMissingCardIds(state: Pick<GameState, "ownedCardIds">) {
+  return requiredGateCardIds.filter((cardId) => !state.ownedCardIds.includes(cardId));
+}
+
+export function canOpenTempleGate(state: Pick<GameState, "ownedCardIds" | "insightPoints">) {
+  return getRequiredMissingCardIds(state).length === 0 && state.insightPoints >= 7;
+}
+
+export function getHotspotStatus(state: Pick<GameState, "ownedCardIds" | "completedHotspotIds" | "insightPoints" | "sCardClaimed">, hotspot: SceneHotspot): HotspotStatus {
+  if (hotspot.kind === "gate") {
+    if (hotspot.cardId === "asukadera" && state.sCardClaimed) return "complete";
+    return canOpenTempleGate(state) ? "unconfirmed" : "locked";
+  }
+
+  if (hotspot.kind === "event") {
+    return state.completedHotspotIds.includes(hotspot.id) ? "complete" : "unconfirmed";
+  }
+
+  if (hotspot.cardId && state.ownedCardIds.includes(hotspot.cardId)) {
+    return "complete";
+  }
+
+  return "unconfirmed";
+}
+
+export function getCardBookProgress(state: Pick<GameState, "ownedCardIds" | "insightPoints" | "sCardClaimed">): CardBookProgress {
+  const ownedCount = state.ownedCardIds.length;
+  const totalCount = cardLibrary.length;
   return {
-    ...player,
-    items: exists ? player.items.map((item) => (item.itemId === itemId ? { ...item, count: item.count + count } : item)) : [...player.items, { itemId, count }]
+    ownedCount,
+    totalCount,
+    completionRate: totalCount === 0 ? 0 : ownedCount / totalCount,
+    missingRequiredCardIds: getRequiredMissingCardIds(state),
+    gateReady: canOpenTempleGate(state)
   };
 }
 
-export function getAttack(player: Player) {
-  return player.attack + (equipment[player.weaponId]?.attack ?? 0);
+export function getCardRankLabel(rank: CardRank) {
+  return rank === "S" ? "S" : rank === "A" ? "A" : "C";
 }
 
-export function getDefense(player: Player) {
-  return player.defense + (equipment[player.armorId]?.defense ?? 0);
+export function getEventChoices(state: Pick<GameState, "ownedCardIds">, eventId: EventId) {
+  return getOwnedCards(state)
+    .slice()
+    .sort((left, right) => {
+      const weightGap = right.eventWeights[eventId] - left.eventWeights[eventId];
+      if (weightGap !== 0) return weightGap;
+      const rankGap = rankWeight(right.rank) - rankWeight(left.rank);
+      if (rankGap !== 0) return rankGap;
+      return left.title.localeCompare(right.title, "ja");
+    })
+    .slice(0, 3);
 }
 
-export function calcDamage(attackerAttack: number, defenderDefense: number) {
-  return Math.max(1, attackerAttack - defenderDefense + Math.floor(Math.random() * 5) - 2);
+export function getEventDefinition(eventId: EventId) {
+  return eventLibrary[eventId];
 }
 
-export function applyLevelUps(player: Player) {
-  let nextPlayer = { ...player };
-  for (const entry of levelTable) {
-    if (entry.level > nextPlayer.level && nextPlayer.exp >= entry.requiredExp) {
-      nextPlayer = {
-        ...nextPlayer,
-        level: entry.level,
-        maxHp: nextPlayer.maxHp + 7,
-        maxMp: nextPlayer.maxMp + 3,
-        attack: nextPlayer.attack + 2,
-        defense: nextPlayer.defense + 1
-      };
-      nextPlayer.hp = nextPlayer.maxHp;
-      nextPlayer.mp = nextPlayer.maxMp;
-    }
-  }
-  return nextPlayer;
+export function getHotspotCardLabel(hotspot: SceneHotspot) {
+  if (hotspot.kind === "gate") return "S";
+  if (hotspot.kind === "event") return "3択";
+  if (!hotspot.cardId) return "";
+  return getCardRankLabel(getCard(hotspot.cardId).rank);
 }
 
-export function getNextLevel(level: number) {
-  return levelTable.find((entry) => entry.level > level);
-}
-
-export function getField(fieldId: FieldId) {
-  return fields[fieldId] ?? fields[TOWN_OUTSKIRTS_FIELD_ID];
-}
-
-export function getCurrentField(game: GameState) {
-  return getField(game.fieldId ?? game.currentFieldId ?? TOWN_OUTSKIRTS_FIELD_ID);
-}
-
-export function isInsideMap(fieldId: FieldId, position: Position) {
-  const field = getField(fieldId);
-  return position.y >= 0 && position.y < field.map.length && position.x >= 0 && position.x < field.map[0].length;
-}
-
-export function getTile(fieldId: FieldId, position: Position) {
-  return getField(fieldId).map[position.y][position.x];
-}
-
-export function getFieldTransition(fieldId: FieldId, position: Position) {
-  return getField(fieldId).transitions[posKey(position)] ?? null;
-}
-
-export function shouldEncounter(fieldId: FieldId, tile: FieldTile, steps: number, roll = Math.random()) {
-  const field = getField(fieldId);
-  if (field.encounterArea === "safe" || tile === "water" || tile === "town" || tile === "gate" || tile === "chest" || tile === "goal" || tile === "boss" || tile === "blocked" || tile === "landmark") return false;
-  if (steps < 2) return false;
-
-  const chance =
-    field.encounterArea === "grassland"
-      ? tile === "road"
-        ? 0.12
-        : tile === "hill"
-          ? 0.16
-          : 0.2
-      : field.encounterArea === "forest"
-        ? tile === "forest"
-          ? 0.36
-          : 0.22
-        : field.encounterArea === "forest_depth"
-          ? tile === "forest"
-            ? 0.42
-            : 0.3
-          : tile === "forest"
-            ? 0.28
-            : 0.14;
-
-  return roll < chance;
-}
-
-export function spawnEnemy(fieldId: FieldId, tile: FieldTile): Enemy {
-  const field = getField(fieldId);
-  const pool =
-    field.encounterArea === "grassland"
-      ? enemies.filter((enemy) => enemy.area === "grassland")
-      : field.encounterArea === "forest_depth"
-        ? enemies.filter((enemy) => enemy.area === "forest")
-        : enemies.filter((enemy) => enemy.area === "forest" || enemy.area === "forest_depth");
-  const preferred = tile === "forest" && field.encounterArea !== "grassland" ? enemies.filter((enemy) => enemy.area === "forest" || enemy.area === "forest_depth") : pool;
-  const base = preferred[Math.floor(Math.random() * preferred.length)] ?? enemies[0];
-  return { ...base, hp: base.maxHp };
-}
-
-export function spawnMiniBoss(): Enemy {
-  const base = enemies.find((enemy) => enemy.role === "mini_boss") ?? enemies[0];
-  return { ...base, hp: base.maxHp };
-}
-
-export function tileLabel(tile: FieldTile) {
-  const labels: Record<FieldTile, string> = {
-    water: "水辺",
-    shore: "浜",
-    grass: "草原",
-    road: "街道",
-    forest: "森",
-    chest: "宝箱",
-    boss: "奥地",
-    hill: "丘",
-    goal: "光",
-    town: "町",
-    gate: "門",
-    blocked: "封",
-    landmark: "碑"
-  };
-  return labels[tile] ?? tile;
-}
-
-export function tileClass(tile: FieldTile) {
-  const classes: Record<FieldTile, string> = {
-    water: "bg-[#6da1c9]",
-    shore: "bg-[#b8d6c6]",
-    grass: "bg-[#91bd74]",
-    road: "bg-[#d8c48d]",
-    forest: "bg-[#3f6f4f]",
-    chest: "bg-[#d8c48d]",
-    boss: "bg-[#7c5f8f]",
-    hill: "bg-[#88aa63]",
-    goal: "bg-[#7c5f8f]",
-    town: "bg-[#d8c48d]",
-    gate: "bg-[#c59c55]",
-    blocked: "bg-[#6f7882]",
-    landmark: "bg-[#8a8f96]"
-  };
-  return classes[tile] ?? "bg-[#91bd74]";
-}
-
-const TILE_ATLAS_COLUMNS = 8;
-const TILE_ATLAS_ROWS = 5;
-const FIELD_TEXTURE_ROOT = "/images/learning-rpg/field-atlas";
-
-function atlasPosition(index: number) {
-  const zeroBased = index - 1;
-  return {
-    column: zeroBased % TILE_ATLAS_COLUMNS,
-    row: Math.floor(zeroBased / TILE_ATLAS_COLUMNS)
-  };
-}
-
-function spriteStyle(fileName: string, index: number) {
-  const position = atlasPosition(index);
-  return {
-    backgroundImage: `url(${FIELD_TEXTURE_ROOT}/${fileName})`,
-    backgroundRepeat: "no-repeat",
-    backgroundSize: `${TILE_ATLAS_COLUMNS * 100}% ${TILE_ATLAS_ROWS * 100}%`,
-    backgroundPosition: `${(position.column * 100) / (TILE_ATLAS_COLUMNS - 1)}% ${(position.row * 100) / (TILE_ATLAS_ROWS - 1)}%`
-  };
-}
-
-function selectVariant(seed: number, variants: number[]) {
-  return variants[Math.abs(seed) % variants.length] ?? variants[0];
-}
-
-function tileSeed(fieldId: FieldId, x: number, y: number) {
-  return `${fieldId}:${x}:${y}`.split("").reduce((value, char) => value + char.charCodeAt(0), 0);
-}
-
-export function getFieldTileStyle(fieldId: FieldId, tile: FieldTile, position?: Position) {
-  const x = position?.x ?? 0;
-  const y = position?.y ?? 0;
-  const seed = tileSeed(fieldId, x, y);
-  const roadAtlas = fieldId === "forest_depth" ? "forest-depth.jpg" : fieldId === "forest_edge" ? "forest-edge.jpg" : "grassland-road.jpg";
-  const forestAtlas = fieldId === "forest_depth" ? "forest-depth.jpg" : "forest-edge.jpg";
-
-  if (tile === "water") {
-    return spriteStyle(fieldId === "forest_depth" ? "forest-depth.jpg" : "forest-edge.jpg", selectVariant(seed, [89, 92, 96, 109, 110, 111, 114, 115]));
-  }
-  if (tile === "shore") {
-    return spriteStyle(fieldId === "town_outskirts" ? "town-outskirts.jpg" : "forest-edge.jpg", selectVariant(seed, [105, 113, 114, 116]));
-  }
-  if (tile === "grass") {
-    if (fieldId === "town_outskirts") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [1, 3, 7, 8, 17, 25, 27, 30, 31, 33, 34, 35, 36, 37, 38, 39]));
-    if (fieldId === "grassland_road") return spriteStyle("grassland-road.jpg", selectVariant(seed, [1, 3, 7, 8, 27, 30, 31, 34, 36, 37, 105, 106]));
-    if (fieldId === "forest_edge") return spriteStyle("forest-edge.jpg", selectVariant(seed, [41, 42, 51, 57, 58, 59, 62, 68, 69, 76]));
-    return spriteStyle("forest-depth.jpg", selectVariant(seed, [41, 42, 57, 58, 59, 62, 68, 69, 76, 77]));
-  }
-  if (tile === "road") {
-    if (fieldId === "town_outskirts") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [4, 15, 21, 22, 36, 37, 145, 146]));
-    if (fieldId === "grassland_road") return spriteStyle("grassland-road.jpg", selectVariant(seed, [4, 5, 29, 36, 37, 151, 162, 163]));
-    return spriteStyle(roadAtlas, selectVariant(seed, [4, 5, 29, 36, 37, 46, 47, 48]));
-  }
-  if (tile === "forest") {
-    if (fieldId === "forest_depth") return spriteStyle("forest-depth.jpg", selectVariant(seed, [9, 10, 31, 34, 35, 51, 57, 58, 68, 69, 76, 77]));
-    return spriteStyle("forest-edge.jpg", selectVariant(seed, [9, 10, 31, 34, 35, 51, 57, 58, 59, 62]));
-  }
-  if (tile === "chest") return spriteStyle("boss-depth.jpg", selectVariant(seed, [15, 71, 175, 19]));
-  if (tile === "boss") return spriteStyle("boss-depth.jpg", selectVariant(seed, [21, 181, 182, 200]));
-  if (tile === "hill") {
-    if (fieldId === "town_outskirts") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [11, 12, 13, 26, 31, 32]));
-    if (fieldId === "grassland_road") return spriteStyle("grassland-road.jpg", selectVariant(seed, [1, 9, 41, 42, 57, 58, 59, 62]));
-    return spriteStyle(forestAtlas, selectVariant(seed, [1, 9, 41, 42, 57, 58, 59, 62, 63, 64]));
-  }
-  if (tile === "goal") return spriteStyle("boss-depth.jpg", selectVariant(seed, [20, 159, 180, 182]));
-  if (tile === "town") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [21, 22, 129, 130, 142, 154]));
-  if (tile === "gate") {
-    if (fieldId === "town_outskirts") return spriteStyle("town-outskirts.jpg", selectVariant(seed, [17, 18, 35, 36, 37, 145, 146]));
-    if (fieldId === "forest_depth") return spriteStyle("forest-depth.jpg", selectVariant(seed, [17, 18, 35, 36, 37, 46, 47]));
-    return spriteStyle("grassland-road.jpg", selectVariant(seed, [17, 18, 35, 36, 37, 46, 47]));
-  }
-  return spriteStyle("grassland-road.jpg", 1);
-}
-
-export function getLocationLabel(game: GameState) {
-  const field = getCurrentField(game);
-  if (game.screen === "town") return field.townName;
-  if (game.screen === "battle") {
-    return game.currentEnemy?.role === "mini_boss" ? `${field.name} / 小ボス戦` : `${field.name} / 戦闘中`;
-  }
-  if (game.screen === "status") {
-    return game.currentEnemy?.role === "mini_boss" ? `${field.name} / 小ボス戦` : game.currentEnemy ? `${field.name} / 戦闘中` : `${field.name} / 確認画面`;
-  }
-
-  const fieldId = game.fieldId ?? game.currentFieldId ?? TOWN_OUTSKIRTS_FIELD_ID;
-  const tile = getTile(fieldId, game.position);
-  if (tile === "gate") {
-    return getFieldTransition(fieldId, game.position)?.label ?? field.name;
-  }
-
-  const labels: Record<FieldTile, string> = {
-    town: field.townName,
-    grass: "草原",
-    forest: "森",
-    road: "街道",
-    hill: "丘",
-    chest: "宝箱のある場所",
-    boss: "森の奥",
-    shore: "水辺",
-    water: "水辺",
-    goal: "光の場所",
-    gate: field.name,
-    blocked: "通れない道",
-    landmark: "古い石碑"
-  };
-  return labels[tile] ?? field.name;
-}
-
-export function playTone(kind: "victory" | "level" | "treasure" | "boss" | "boss_attack" | "boss_charge") {
-  if (typeof window === "undefined") return;
-  const AudioContextClass = window.AudioContext ?? (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AudioContextClass) return;
-
-  try {
-    const audio = new AudioContextClass();
-    const now = audio.currentTime;
-    const sequence = {
-      victory: [523, 659, 784],
-      level: [659, 784, 988],
-      treasure: [784, 988],
-      boss: [392, 523, 659, 1046],
-      boss_attack: [196, 247, 220],
-      boss_charge: [311, 370, 466, 523]
-    }[kind];
-
-    sequence.forEach((frequency, index) => {
-      const oscillator = audio.createOscillator();
-      const gain = audio.createGain();
-      oscillator.type = "square";
-      oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime(0.04, now + index * 0.09);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + index * 0.09 + 0.08);
-      oscillator.connect(gain);
-      gain.connect(audio.destination);
-      oscillator.start(now + index * 0.09);
-      oscillator.stop(now + index * 0.09 + 0.08);
-    });
-  } catch {
-    // Audio is optional; logs and screen state still carry the result.
-  }
+export function appendLog(log: string[], line: string, max = 8) {
+  return [line, ...log].slice(0, max);
 }

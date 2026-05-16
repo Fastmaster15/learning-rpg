@@ -1,4 +1,6 @@
-import type { Enemy } from "@/lib/learning-rpg-game";
+type Enemy = {
+  id: string;
+};
 
 export function EnemySprite({ enemy }: { enemy: Enemy }) {
   if (enemy.id === "soft_blob") {

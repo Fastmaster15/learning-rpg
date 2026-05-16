@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
 html,
@@ -14,21 +14,19 @@ body {
 body {
   margin: 0;
   background:
-    radial-gradient(circle at top, rgba(210, 164, 103, 0.14), transparent 35%),
-    radial-gradient(circle at bottom left, rgba(47, 127, 143, 0.08), transparent 30%),
-    #f7f4ef;
-  color: #1f2937;
+    radial-gradient(circle at top, rgba(60, 106, 126, 0.18), transparent 32%),
+    radial-gradient(circle at bottom left, rgba(40, 96, 72, 0.14), transparent 28%),
+    #0d1118;
+  color: #f6f0df;
   font-family:
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+    "Noto Serif JP",
+    "Hiragino Mincho ProN",
+    "Yu Mincho",
+    Georgia,
+    serif;
 }
 
 a {
   color: inherit;
   text-decoration: none;
 }
-

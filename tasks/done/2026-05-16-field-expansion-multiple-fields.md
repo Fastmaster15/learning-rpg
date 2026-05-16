@@ -2,7 +2,7 @@
 
 ## Status
 
-Active
+Shelved as rejected prototype
 
 ## Created date
 
@@ -11,6 +11,10 @@ Active
 ## Updated date
 
 2026-05-16
+
+## Retirement note
+
+This prototype was reviewed and intentionally shelved as a rejected direction. Keep it as a reference only unless the field-exploration approach is revisited with a new design pass.
 
 ## Priority
 

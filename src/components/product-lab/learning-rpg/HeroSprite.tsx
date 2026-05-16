@@ -1,19 +1,31 @@
 import Image from "next/image";
+import { learningRpgAssetPaths } from "@/lib/learning-rpg-assets";
 
 export type HeroFacing = "up" | "down" | "left" | "right";
 
-export function HeroSprite({ facing = "down", walking = false }: { facing?: HeroFacing; walking?: boolean }) {
+export function HeroSprite({
+  facing = "down",
+  walking = false,
+  mode = "battle"
+}: {
+  facing?: HeroFacing;
+  walking?: boolean;
+  mode?: "battle" | "field";
+}) {
+  const fieldMode = mode === "field";
   const facingClassName =
     facing === "left"
       ? "scale-x-[-1] -rotate-1"
       : facing === "right"
         ? "rotate-1"
-        : facing === "up"
-          ? "scale-[0.97] brightness-75 saturate-90"
-          : "scale-[1.01]";
+      : facing === "up"
+        ? "scale-[0.97] brightness-75 saturate-90"
+        : "scale-[1.01]";
 
   const frameClassName =
-    facing === "up"
+    fieldMode
+      ? "translate-y-[5%]"
+      : facing === "up"
       ? "translate-y-[-2%]"
       : facing === "down"
         ? "translate-y-[2%]"
@@ -21,7 +33,9 @@ export function HeroSprite({ facing = "down", walking = false }: { facing?: Hero
 
   const bobClassName = walking ? "animate-[hero-step_0.22s_ease-out_1]" : "animate-[hero-bob_2.8s_ease-in-out_infinite]";
   const shadowClassName =
-    facing === "up"
+    fieldMode
+      ? "left-1/2 top-[72%] h-6 w-16 -translate-x-1/2 bg-[#0f1820]/55 blur-2xl"
+      : facing === "up"
       ? "left-1/2 top-[64%] h-6 w-14 -translate-x-1/2 bg-[#0f1820]/60 blur-xl"
       : facing === "down"
         ? "left-1/2 top-[68%] h-7 w-16 -translate-x-1/2 bg-[#0f1820]/50 blur-xl"
@@ -29,12 +43,16 @@ export function HeroSprite({ facing = "down", walking = false }: { facing?: Hero
 
   return (
     <>
-      <div className="absolute inset-1 grid place-items-center">
-        <div className={`relative h-[90%] w-[90%] ${bobClassName}`}>
+      <div className={fieldMode ? "absolute inset-x-1 bottom-0 grid place-items-end" : "absolute inset-1 grid place-items-center"}>
+        <div className={`relative ${fieldMode ? "h-[82%] w-[84%]" : "h-[90%] w-[90%]"} ${bobClassName}`}>
           <div className={`absolute ${shadowClassName} rounded-full`} />
-          <div className={`relative h-full w-full overflow-hidden rounded-[8px] border border-[#f3c57a] bg-[#101820] shadow-[0_12px_28px_rgba(0,0,0,0.3)] ${frameClassName}`}>
+          <div
+            className={`relative h-full w-full overflow-hidden rounded-[8px] border border-[#f3c57a] bg-[#101820] shadow-[0_12px_28px_rgba(0,0,0,0.3)] ${
+              fieldMode ? "translate-y-[2%] rounded-[10px]" : frameClassName
+            }`}
+          >
             <Image
-              src="/images/hero.jpg"
+              src={learningRpgAssetPaths.heroFront}
               alt="主人公"
               fill
               sizes="88vw"
@@ -45,6 +63,7 @@ export function HeroSprite({ facing = "down", walking = false }: { facing?: Hero
             {facing === "left" ? <div className="absolute inset-y-0 left-0 w-10 bg-gradient-to-r from-[#f3c57a]/10 to-transparent" /> : null}
             {facing === "right" ? <div className="absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-[#f3c57a]/10 to-transparent" /> : null}
             <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[#101820]/55 to-transparent" />
+            {fieldMode ? <div className="absolute inset-x-2 bottom-1 h-2 rounded-full bg-[#f3c57a]/16 blur-md" /> : null}
             {walking ? <div className="absolute inset-x-1/2 bottom-3 h-3 w-3 -translate-x-1/2 rounded-full bg-[#f3c57a]/35 blur-sm animate-[hero-dust_0.22s_ease-out_1]" /> : null}
           </div>
         </div>
