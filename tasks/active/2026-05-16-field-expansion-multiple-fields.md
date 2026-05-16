@@ -8,6 +8,10 @@ Active
 
 2026-05-16
 
+## Updated date
+
+2026-05-16
+
 ## Priority
 
 High
@@ -70,6 +74,76 @@ This task is about building a field architecture that can grow into later chapte
 - Keep the hero visibly standing on the current tile.
 - Make the field feel more exploratory.
 - Preserve the current playable loop.
+- Add the design feel of **Dragon Quest-style growth range expansion** plus **Zelda-style curiosity-driven exploration**.
+
+## Experience design principles
+
+This task should not only enlarge the map. It should improve the player's reason to move.
+
+Use the following hybrid direction:
+
+```text
+Dragon Quest-like core:
+- town as safety
+- field as risk
+- battles create EXP/GOLD
+- level and equipment make the player stronger
+- stronger player can go farther
+- boss defeat creates a milestone
+
+Zelda-like exploration layer:
+- interesting things are visible before they are reachable
+- roads, rivers, forests, and blocked paths guide curiosity
+- the player sees a chest, light, shrine, bridge, or narrow path and wants to investigate
+- a place can be visible but not immediately accessible
+- clearing a condition opens or makes sense of the route
+```
+
+Important: do not copy any existing game's characters, maps, UI, music, enemies, names, or assets. Borrow only the experience structure.
+
+### Player psychology to create
+
+The field should gradually create these feelings:
+
+```text
+町の近くは安心
+↓
+道に沿って進めば大丈夫そう
+↓
+草原には少し危険がある
+↓
+水辺や森の奥に何か見える
+↓
+今はまだ無理そうな場所がある
+↓
+戦って強くなると、もう少し遠くへ行ける
+↓
+小ボスを倒すと、見えていた光や目的地に到達できる
+```
+
+### Learning RPG-specific direction
+
+Eventually, knowledge should act like a key.
+
+Do not implement real quiz logic in this task, but prepare map design and data naming so that later tasks can add:
+
+```text
+- learning gate
+- knowledge gate
+- quiz gate
+- concept key
+- route unlocked by understanding
+```
+
+Examples for future Japanese History chapters:
+
+```text
+- understanding rice farming unlocks a Yayoi village event
+- understanding go-on and hoko unlocks a Kamakura checkpoint
+- understanding black ships and external pressure unlocks a Bakumatsu route
+```
+
+For this task, it is enough to include visible but gated routes conceptually through tiles, logs, labels, or field layout.
 
 ## Non-goals
 
@@ -253,6 +327,8 @@ chest
 boss
 goal
 exit
+blocked
+landmark
 ```
 
 An exit should be defined by coordinates in the active field definition, not only by tile name.
@@ -309,7 +385,44 @@ objectiveCleared = true
 Display clear message
 ```
 
-### 8. Fix status screen return behavior
+### 8. Add Zelda-like curiosity cues to the maps
+
+The 16x12 fields should include at least a few visible curiosity cues.
+
+Examples:
+
+```text
+- a chest visible across water or behind trees
+- a road that bends toward the next field
+- a blocked-looking path that becomes meaningful later
+- a landmark tile such as light, stone, shrine, bridge, old gate, or hill
+- a goal/light tile visible in forest_depth before it is fully useful
+```
+
+Implementation can be lightweight:
+
+- use existing tile labels
+- add `landmark` or `blocked` tile if useful
+- add a log / dialogue line when stepping near or onto the tile
+- use layout to make the player wonder what is there
+
+Do not implement puzzle mechanics yet.
+
+### 9. Add future learning-gate placeholders without quiz logic
+
+Prepare naming or simple tile concepts so later tasks can connect learning to route unlocking.
+
+Acceptable P0/P1 options:
+
+```text
+- define a `blocked` tile with message: "ここはまだ通れない。何かを理解すれば道が開きそうだ。"
+- define a `landmark` tile with message: "古い石碑がある。後で学びの問いに使えそうだ。"
+- add optional field metadata such as `learningGateNote`
+```
+
+Do not implement actual quiz checks or answer validation in this task.
+
+### 10. Fix status screen return behavior
 
 Currently, status return behavior can send the player back to town even if they opened status from the field.
 
@@ -341,7 +454,7 @@ function closeStatus() {
 }
 ```
 
-### 9. Fix return-to-town behavior
+### 11. Fix return-to-town behavior
 
 When returning to town from field or defeat, keep screen and position consistent.
 
@@ -361,7 +474,7 @@ Behavior:
 
 Do not only call `setScreen("town")` when the intent is returning to town.
 
-### 10. Make healing consume a battle turn
+### 12. Make healing consume a battle turn
 
 Currently, `heal` and `herb` can restore HP without enemy response.
 
@@ -381,7 +494,7 @@ Edge cases:
 - If the enemy defeats the player after healing, defeat behavior should still trigger.
 - If there is no current enemy, do nothing safely.
 
-### 11. Preserve existing save data as much as possible
+### 13. Preserve existing save data as much as possible
 
 Existing localStorage saves may not have `fieldId` or `previousScreen`.
 
@@ -399,7 +512,7 @@ If an old saved position is outside the new field dimensions, reset to the start
 
 Do not introduce hard crashes for old saves.
 
-### 12. Update README / docs lightly
+### 14. Update README / docs lightly
 
 Update README or add a short implementation note if appropriate.
 
@@ -408,6 +521,7 @@ Mention:
 - fields are now 16x12
 - multiple connected fields exist
 - the prototype now supports a small world route from town outskirts to forest depth
+- the map now intentionally combines growth-range expansion and curiosity-driven exploration
 
 Do not over-document if the code is clear.
 
@@ -418,11 +532,13 @@ Do not over-document if the code is clear.
 3. Update `getTile`, `isInsideMap`, `shouldEncounter`, and field helpers.
 4. Update `FieldScreen` dynamic rendering.
 5. Add field transition handling in `move()`.
-6. Fix status return behavior.
-7. Fix return-to-town behavior.
-8. Make heal/herb consume a turn.
-9. Add save migration defaults.
-10. Run build and lint.
+6. Add curiosity cue tiles / logs / landmarks in the field layouts.
+7. Add simple learning-gate placeholders without quiz logic.
+8. Fix status return behavior.
+9. Fix return-to-town behavior.
+10. Make heal/herb consume a turn.
+11. Add save migration defaults.
+12. Run build and lint.
 
 ## Map design guidance
 
@@ -437,6 +553,7 @@ Should include:
 - grassland around the road
 - water or shore as boundary
 - exit to grassland_road
+- a distant hint that the world continues beyond town
 
 ### grassland_road
 
@@ -445,6 +562,7 @@ Should include:
 - road crossing the field
 - grass areas
 - at least one chest or side reward if easy
+- something visible but slightly off-route
 - exit back to town_outskirts
 - exit to forest_edge
 
@@ -455,6 +573,7 @@ Should include:
 - denser forest
 - some road or path
 - stronger encounter profile
+- a suspicious landmark, stone, or blocked path placeholder
 - exit to grassland_road
 - exit to forest_depth
 
@@ -463,8 +582,9 @@ Should include:
 Should include:
 
 - boss tile
-- goal tile
+- goal/light tile
 - dense forest / hills
+- visible goal cue before or around the boss area
 - exit back to forest_edge
 - no need for many random features yet
 
@@ -476,6 +596,9 @@ Should include:
 - Field rendering is dynamic and no longer hardcoded to 5x5.
 - Player can transition between at least 4 fields.
 - Hero remains visibly on the current tile.
+- Map layouts show a progression from safe town area to dangerous forest depth.
+- At least two curiosity cues exist, such as visible chest, landmark, light, blocked path, bridge, or suspicious route.
+- At least one learning-gate placeholder exists as a tile, metadata note, or log message, without implementing quiz logic.
 - Town return keeps screen, fieldId, and position consistent.
 - Status screen returns to the correct previous screen.
 - Heal and herb consume a battle turn.
@@ -508,6 +631,7 @@ npm run lint
 - Old `getTile(position)` logic may need to become `getTile(fieldId, position)`.
 - Adding multiple fields without clear exits can make the player feel lost.
 - Increasing field size without encounter balancing can make the game tedious.
+- Adding curiosity cues without interaction can feel decorative only; use at least log/dialogue feedback.
 
 ## Final response format for Codex
 
@@ -517,6 +641,9 @@ When complete, report:
 - Field IDs added
 - Final field size
 - How multiple field transitions work
+- How Dragon Quest-style growth-range expansion was reflected
+- How Zelda-style curiosity cues were reflected
+- What learning-gate placeholder was added
 - How dynamic grid rendering was implemented
 - How status return behavior was fixed
 - How return-to-town behavior was fixed
