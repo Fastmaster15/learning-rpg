@@ -1,9 +1,12 @@
 import type { ReactNode } from "react";
 
 import {
+  FIELD_HEIGHT,
+  FIELD_WIDTH,
+  type FieldDefinition,
   TREASURE_CHEST_ID,
   equipment,
-  fieldMap,
+  getFieldTransition,
   getNextLevel,
   type Enemy,
   type Equipment,
@@ -26,6 +29,7 @@ export function StatusBar({ player, attack, defense, nextExp, location }: { play
 
 export function TownScreen({
   game,
+  field,
   onNpc,
   onRest,
   onBuy,
@@ -33,6 +37,7 @@ export function TownScreen({
   onStatus
 }: {
   game: GameState;
+  field: FieldDefinition;
   onNpc: (kind: "goal" | "heal" | "shop" | "boss" | "world") => void;
   onRest: () => void;
   onBuy: (itemId: "bronze_sword" | "leather_armor") => void;
@@ -69,7 +74,7 @@ export function TownScreen({
         </div>
 
         <button type="button" onClick={onField} className="rounded-[6px] border border-[#f3c57a] bg-[#f3c57a] px-4 py-4 text-left font-black text-[#16222d] transition hover:bg-white">
-          フィールドへ出る
+          {field.name}へ出る
         </button>
       </div>
     </GamePanel>
@@ -78,31 +83,48 @@ export function TownScreen({
 
 export function FieldScreen({
   game,
+  field,
   onMove,
   onTown,
   onSeek,
   onStatus
 }: {
   game: GameState;
+  field: FieldDefinition;
   onMove: (direction: "up" | "down" | "left" | "right") => void;
   onTown: () => void;
   onSeek: () => void;
   onStatus: () => void;
 }) {
   return (
-    <GamePanel title="北のフィールド" subtitle="探索">
-      <div className="grid gap-4 xl:grid-cols-[1fr_220px]">
-        <div className="grid aspect-square grid-cols-5 grid-rows-5 overflow-hidden rounded-[6px] border border-[#394b39]">
-          {fieldMap.flatMap((row, y) =>
+    <GamePanel title={field.name} subtitle="探索">
+      <div className="grid gap-4 xl:grid-cols-[1fr_240px]">
+        <div className="grid overflow-hidden rounded-[6px] border border-[#394b39]" style={{ gridTemplateColumns: `repeat(${FIELD_WIDTH}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${FIELD_HEIGHT}, minmax(0, 1fr))` }}>
+          {field.map.flatMap((row, y) =>
             row.map((tile, x) => {
               const playerHere = game.position.x === x && game.position.y === y;
+              const transition = getFieldTransition(field.fieldId, { x, y });
+              const label =
+                tile === "town"
+                  ? "町"
+                  : tile === "chest"
+                    ? game.openedChestIds.includes(TREASURE_CHEST_ID)
+                      ? "空"
+                      : "宝"
+                    : tile === "boss"
+                      ? game.miniBossDefeated
+                        ? "静"
+                        : "主"
+                      : tile === "goal"
+                        ? "光"
+                        : tile === "gate"
+                          ? transition?.label ?? "門"
+                          : "";
+
               return (
                 <div key={`${x}-${y}`} className={`relative border border-black/20 ${tileClass(tile)}`}>
                   {playerHere ? <div className="absolute inset-2 grid place-items-center rounded-[4px] border border-[#f3c57a] bg-[#101820] text-sm font-black text-[#f3c57a]">勇</div> : null}
-                  {!playerHere && tile === "town" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-[#16222d]">町</span> : null}
-                  {!playerHere && tile === "chest" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-[#16222d]">{game.openedChestIds.includes(TREASURE_CHEST_ID) ? "空" : "宝"}</span> : null}
-                  {!playerHere && tile === "boss" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-white">{game.miniBossDefeated ? "光" : "主"}</span> : null}
-                  {!playerHere && tile === "goal" ? <span className="absolute inset-0 grid place-items-center text-xs font-black text-white">光</span> : null}
+                  {!playerHere && label ? <span className={`absolute inset-0 grid place-items-center text-[10px] font-black ${tile === "forest" || tile === "boss" || tile === "goal" ? "text-white" : "text-[#16222d]"}`}>{label}</span> : null}
                 </div>
               );
             })
@@ -110,6 +132,14 @@ export function FieldScreen({
         </div>
 
         <div className="grid gap-3 content-start">
+          <div className="rounded-[6px] border border-[#40505c] bg-[#101820] p-3">
+            <p className="text-xs font-bold tracking-[0.18em] text-[#8aa0ad] uppercase">FIELD INFO</p>
+            <div className="mt-3 grid gap-2 text-sm">
+              <Info label="FIELD ID" value={field.fieldId} dark />
+              <Info label="SIZE" value={`${FIELD_WIDTH} × ${FIELD_HEIGHT}`} dark />
+              <Info label="GOAL" value={field.description} dark />
+            </div>
+          </div>
           <div className="grid grid-cols-3 gap-2">
             <span />
             <CommandButton label="↑" detail="北" onClick={() => onMove("up")} />
@@ -162,8 +192,8 @@ export function BattleScreen({
         <div className="grid gap-3 sm:grid-cols-2">
           <CommandButton label="たたかう" detail="通常攻撃" onClick={onAttack} />
           <CommandButton label="火の玉" detail="MP 3 / 強攻撃" onClick={onFire} disabled={player.mp < 3} />
-          <CommandButton label="小回復" detail="MP 3 / HP回復" onClick={onHeal} disabled={player.mp < 3} />
-          <CommandButton label={`薬草 ${herbCount}`} detail="HP回復" onClick={onHerb} disabled={herbCount <= 0} />
+          <CommandButton label="小回復" detail="MP 3 / ターン消費" onClick={onHeal} disabled={player.mp < 3} />
+          <CommandButton label={`薬草 ${herbCount}`} detail="HP回復 / ターン消費" onClick={onHerb} disabled={herbCount <= 0} />
           <CommandButton label="にげる" detail={enemy.role === "mini_boss" ? "小ボス戦は不可" : "成功率70%"} onClick={onFlee} />
         </div>
       </div>
@@ -189,7 +219,7 @@ export function StatusScreen({ player, attack, defense, onBack }: { player: Play
         <Info label="防具" value={equipment[player.armorId].name} />
       </div>
       <button type="button" onClick={onBack} className="mt-4 rounded-[6px] border border-[#f3c57a] bg-[#f3c57a] px-4 py-3 text-left font-black text-[#16222d] transition hover:bg-white">
-        戻る
+        前の画面へ戻る
       </button>
     </GamePanel>
   );

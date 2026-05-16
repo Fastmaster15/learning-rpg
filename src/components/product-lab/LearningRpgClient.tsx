@@ -8,16 +8,18 @@ import {
   TREASURE_CHEST_ID,
   addItem,
   calcDamage,
+  fields,
   equipment,
   getAttack,
+  getCurrentField,
+  getFieldTransition,
   getItemCount,
   getLocationLabel,
   getNextLevel,
   getTile,
-  fieldMap,
   initialGameState,
+  type FieldTile,
   type GameState,
-  type Screen,
   isInsideMap,
   playTone,
   shouldEncounter,
@@ -44,6 +46,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
   const nextLevel = getNextLevel(player.level);
   const herbCount = getItemCount(player, "herb");
   const location = getLocationLabel(game);
+  const currentField = getCurrentField(game);
 
   useEffect(() => {
     const saved = loadGame();
@@ -65,6 +68,9 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       ...initialGameState,
       started: true,
       screen: "town",
+      previousScreen: "town",
+      currentFieldId: initialGameState.currentFieldId,
+      position: fields[initialGameState.currentFieldId].entryPosition,
       log: ["朝の町に着いた。", "北の森で小さな光が見えたらしい。"]
     });
   }
@@ -80,8 +86,35 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
     }
   }
 
-  function setScreen(screen: Screen) {
-    setGame((current) => ({ ...current, screen }));
+  function openStatus() {
+    setGame((current) => ({
+      ...current,
+      previousScreen: current.screen === "status" ? current.previousScreen : current.screen,
+      screen: "status"
+    }));
+  }
+
+  function returnToTown(message?: string) {
+    setGame((current) => ({
+      ...current,
+      screen: "town",
+      currentEnemy: null,
+      dialogue: message ?? "町に戻った。宿屋と店で準備しよう。",
+      log: [message ?? "町に戻った。", ...current.log].slice(0, 8)
+    }));
+  }
+
+  function enterField(fieldId: keyof typeof fields) {
+    const field = fields[fieldId as keyof typeof fields];
+    setGame((current) => ({
+      ...current,
+      currentFieldId: field.fieldId,
+      position: field.entryPosition,
+      currentEnemy: null,
+      screen: "field",
+      dialogue: `${field.name} に出た。`,
+      log: [`${field.name} に出た。`, ...current.log].slice(0, 8)
+    }));
   }
 
   function talkToNpc(kind: "goal" | "heal" | "shop" | "boss" | "world") {
@@ -131,16 +164,31 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
 
   function move(direction: "up" | "down" | "left" | "right") {
     setGame((current) => {
+      const field = getCurrentField(current);
       const nextPosition = {
         x: current.position.x + (direction === "right" ? 1 : direction === "left" ? -1 : 0),
         y: current.position.y + (direction === "down" ? 1 : direction === "up" ? -1 : 0)
       };
 
-      if (!isInsideMap(nextPosition)) {
+      if (!isInsideMap(current.currentFieldId, nextPosition)) {
         return { ...current, log: ["そこから先へは進めない。", ...current.log].slice(0, 8) };
       }
 
-      const tile = getTile(nextPosition);
+      const transition = getFieldTransition(current.currentFieldId, nextPosition);
+      if (transition) {
+        const nextField = fields[transition.toFieldId];
+        return {
+          ...current,
+          currentFieldId: transition.toFieldId,
+          position: transition.toPosition,
+          screen: "field",
+          currentEnemy: null,
+          dialogue: `${field.name} から ${nextField.name} に移動した。`,
+          log: [`${transition.label}へ進んだ。`, ...current.log].slice(0, 8)
+        };
+      }
+
+      const tile = getTile(current.currentFieldId, nextPosition);
       if (tile === "water") {
         return { ...current, log: ["水辺が行く手をふさいでいる。", ...current.log].slice(0, 8) };
       }
@@ -217,7 +265,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       }
 
       const steps = current.steps + 1;
-      const enemy = shouldEncounter(tile, steps) ? spawnEnemy(tile) : null;
+      const enemy = shouldEncounter(tile, steps) ? spawnEnemy(current.currentFieldId, tile) : null;
       if (enemy) {
         return {
           ...current,
@@ -240,8 +288,8 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
 
   function seekBattle() {
     setGame((current) => {
-      const tile = getTile(current.position);
-      const enemy = tile === "boss" ? spawnMiniBoss() : spawnEnemy(tile === "forest" ? "forest" : "grass");
+      const tile = getTile(current.currentFieldId, current.position);
+      const enemy = tile === "boss" ? spawnMiniBoss() : spawnEnemy(current.currentFieldId, tile);
       return {
         ...current,
         screen: "battle",
@@ -273,11 +321,13 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       const player = { ...current.player, mp: current.player.mp - 3 };
       if (spell === "heal") {
         const healed = Math.min(player.maxHp, player.hp + 18);
-        return {
-          ...current,
-          player: { ...player, hp: healed },
-          log: [`${current.player.name}は小回復を唱えた。`, `HPが${healed - player.hp}回復した。`, ...current.log].slice(0, 8)
-        };
+        return enemyTurn(
+          {
+            ...current,
+            player: { ...player, hp: healed }
+          },
+          [`${current.player.name}は小回復を唱えた。`, `HPが${healed - player.hp}回復した。`]
+        );
       }
 
       const enemy = { ...current.currentEnemy, hp: Math.max(0, current.currentEnemy.hp - 12) };
@@ -300,11 +350,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
         hp: healed,
         items: current.player.items.map((item) => (item.itemId === "herb" ? { ...item, count: Math.max(0, item.count - 1) } : item))
       };
-      return {
-        ...current,
-        player,
-        log: ["薬草を使った。", `HPが${healed - current.player.hp}回復した。`, ...current.log].slice(0, 8)
-      };
+      return enemyTurn({ ...current, player }, ["薬草を使った。", `HPが${healed - current.player.hp}回復した。`]);
     });
   }
 
@@ -327,17 +373,19 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
   }
 
   if (game.screen === "title" || !game.started) {
+    const previewTiles: FieldTile[] = ["water", "water", "grass", "grass", "hill", "hill", "grass", "road", "road", "forest", "forest", "goal"];
+    const previewFillTiles: FieldTile[] = ["forest", "road", "hill", "grass"];
     return (
       <main className="min-h-screen overflow-hidden rounded-[6px] border border-[#243341] bg-[#0d1118] text-[#f6f0df] shadow-[0_28px_90px_rgba(12,17,24,0.42)]">
         <section className="grid min-h-[76vh] content-between bg-[linear-gradient(180deg,#263f50_0%,#182633_42%,#0d1118_100%)] px-5 py-6 md:px-9 md:py-8">
           <div className="grid gap-4">
             <div className="h-36 overflow-hidden rounded-[6px] border border-[#516575] bg-[#6da1c9] md:h-52">
               <div className="grid h-full grid-cols-12 grid-rows-6">
-                {["water", "water", "grass", "grass", "hill", "mountain", "grass", "road", "road", "forest", "forest", "goal"].map((tile, index) => (
+                {previewTiles.map((tile, index) => (
                   <div key={index} className={tileClass(tile)} />
                 ))}
                 {Array.from({ length: 60 }).map((_, index) => (
-                  <div key={`fill-${index}`} className={tileClass(index % 11 === 0 ? "forest" : index % 7 === 0 ? "road" : index % 5 === 0 ? "hill" : "grass")} />
+                  <div key={`fill-${index}`} className={tileClass(previewFillTiles[index % previewFillTiles.length])} />
                 ))}
               </div>
             </div>
@@ -372,15 +420,15 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
         <section className="grid gap-4">
           <StatusBar player={player} attack={attack} defense={defense} nextExp={nextLevel?.requiredExp ?? player.exp} location={location} />
           {game.screen === "town" ? (
-            <TownScreen game={game} onNpc={talkToNpc} onRest={restAtInn} onBuy={buyEquipment} onField={() => setScreen("field")} onStatus={() => setScreen("status")} />
+            <TownScreen game={game} field={currentField} onNpc={talkToNpc} onRest={restAtInn} onBuy={buyEquipment} onField={() => enterField(game.currentFieldId)} onStatus={openStatus} />
           ) : null}
           {game.screen === "field" ? (
-            <FieldScreen game={game} onMove={move} onTown={() => setScreen("town")} onSeek={seekBattle} onStatus={() => setScreen("status")} />
+            <FieldScreen game={game} field={currentField} onMove={move} onTown={() => returnToTown()} onSeek={seekBattle} onStatus={openStatus} />
           ) : null}
           {game.screen === "battle" ? (
             <BattleScreen enemy={game.currentEnemy} player={player} herbCount={herbCount} onAttack={attackEnemy} onFire={() => castSpell("fire")} onHeal={() => castSpell("heal")} onHerb={useHerb} onFlee={fleeBattle} />
           ) : null}
-          {game.screen === "status" ? <StatusScreen player={player} attack={attack} defense={defense} onBack={() => setScreen(game.currentEnemy ? "battle" : "town")} /> : null}
+          {game.screen === "status" ? <StatusScreen player={player} attack={attack} defense={defense} onBack={() => setGame((current) => ({ ...current, screen: current.previousScreen }))} /> : null}
         </section>
 
         <aside className="grid gap-4 content-start">
