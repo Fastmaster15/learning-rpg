@@ -18,6 +18,7 @@ import {
   getNextLevel,
   getTile,
   initialGameState,
+  type FieldId,
   type FieldTile,
   type GameState,
   isInsideMap,
@@ -69,8 +70,9 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       started: true,
       screen: "town",
       previousScreen: "town",
-      currentFieldId: initialGameState.currentFieldId,
-      position: fields[initialGameState.currentFieldId].entryPosition,
+      fieldId: initialGameState.fieldId,
+      currentFieldId: initialGameState.fieldId,
+      position: fields[initialGameState.fieldId].entryPosition,
       log: ["朝の町に着いた。", "北の森で小さな光が見えたらしい。"]
     });
   }
@@ -89,28 +91,45 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
   function openStatus() {
     setGame((current) => ({
       ...current,
-      previousScreen: current.screen === "status" ? current.previousScreen : current.screen,
+      previousScreen: current.screen === "status" ? current.previousScreen ?? "town" : current.screen,
       screen: "status"
     }));
+  }
+
+  function closeStatus() {
+    setGame((current) => {
+      const nextScreen = current.previousScreen ?? "town";
+      return {
+        ...current,
+        screen: nextScreen,
+        previousScreen: null
+      };
+    });
   }
 
   function returnToTown(message?: string) {
     setGame((current) => ({
       ...current,
       screen: "town",
+      fieldId: initialGameState.fieldId,
+      currentFieldId: initialGameState.fieldId,
+      position: fields[initialGameState.fieldId].entryPosition,
       currentEnemy: null,
+      steps: 0,
       dialogue: message ?? "町に戻った。宿屋と店で準備しよう。",
       log: [message ?? "町に戻った。", ...current.log].slice(0, 8)
     }));
   }
 
-  function enterField(fieldId: keyof typeof fields) {
-    const field = fields[fieldId as keyof typeof fields];
+  function enterField(fieldId: FieldId) {
+    const field = fields[fieldId];
     setGame((current) => ({
       ...current,
       currentFieldId: field.fieldId,
+      fieldId: field.fieldId,
       position: field.entryPosition,
       currentEnemy: null,
+      steps: 0,
       screen: "field",
       dialogue: `${field.name} に出た。`,
       log: [`${field.name} に出た。`, ...current.log].slice(0, 8)
@@ -119,10 +138,10 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
 
   function talkToNpc(kind: "goal" | "heal" | "shop" | "boss" | "world") {
     const lines = {
-      goal: "北の森で、あやしい光を見た人がいるらしい。道を外れすぎる前に戻れる場所を覚えておけ。",
+      goal: "北の森で、あやしい光を見た人がいるらしい。いずれは学んだぶんだけ開く門も作る予定だ。",
       heal: "傷ついたら無理をするな。町に戻って休めば、また遠くまで歩ける。",
       shop: "森に行くなら、少し良い武器を持つと安心だよ。ゴールドは使ってこそ力になる。",
-      boss: "森の奥には、普通の魔物とは違う気配がある。薬草と装備を整えてから行くんだ。",
+      boss: "森の奥には、普通の魔物とは違う気配がある。知識の門はまだ仮のものだが、先にあると覚えておけ。",
       world: "この町は旅人たちの休み場さ。外は静かだけど、森の奥は少しだけ空気が違う。"
     };
     setGame((current) => ({ ...current, dialogue: lines[kind], log: [lines[kind], ...current.log].slice(0, 8) }));
@@ -165,30 +184,33 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
   function move(direction: "up" | "down" | "left" | "right") {
     setGame((current) => {
       const field = getCurrentField(current);
+      const currentFieldId = current.fieldId ?? current.currentFieldId ?? initialGameState.fieldId;
       const nextPosition = {
         x: current.position.x + (direction === "right" ? 1 : direction === "left" ? -1 : 0),
         y: current.position.y + (direction === "down" ? 1 : direction === "up" ? -1 : 0)
       };
 
-      if (!isInsideMap(current.currentFieldId, nextPosition)) {
+      if (!isInsideMap(currentFieldId, nextPosition)) {
         return { ...current, log: ["そこから先へは進めない。", ...current.log].slice(0, 8) };
       }
 
-      const transition = getFieldTransition(current.currentFieldId, nextPosition);
+      const transition = getFieldTransition(currentFieldId, nextPosition);
       if (transition) {
         const nextField = fields[transition.toFieldId];
         return {
           ...current,
           currentFieldId: transition.toFieldId,
+          fieldId: transition.toFieldId,
           position: transition.toPosition,
           screen: "field",
           currentEnemy: null,
+          steps: 0,
           dialogue: `${field.name} から ${nextField.name} に移動した。`,
           log: [`${transition.label}へ進んだ。`, ...current.log].slice(0, 8)
         };
       }
 
-      const tile = getTile(current.currentFieldId, nextPosition);
+      const tile = getTile(currentFieldId, nextPosition);
       if (tile === "water") {
         return { ...current, log: ["水辺が行く手をふさいでいる。", ...current.log].slice(0, 8) };
       }
@@ -197,8 +219,11 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
         return {
           ...current,
           screen: "town",
-          position: nextPosition,
+          fieldId: initialGameState.fieldId,
+          currentFieldId: initialGameState.fieldId,
+          position: fields[initialGameState.fieldId].entryPosition,
           currentEnemy: null,
+          steps: 0,
           log: ["町に戻った。", ...current.log].slice(0, 8),
           dialogue: "町に戻ると少し安心する。宿屋と店で準備しよう。"
         };
@@ -265,7 +290,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
       }
 
       const steps = current.steps + 1;
-      const enemy = shouldEncounter(tile, steps) ? spawnEnemy(current.currentFieldId, tile) : null;
+      const enemy = shouldEncounter(currentFieldId, tile, steps) ? spawnEnemy(currentFieldId, tile) : null;
       if (enemy) {
         return {
           ...current,
@@ -288,8 +313,9 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
 
   function seekBattle() {
     setGame((current) => {
-      const tile = getTile(current.currentFieldId, current.position);
-      const enemy = tile === "boss" ? spawnMiniBoss() : spawnEnemy(current.currentFieldId, tile);
+      const fieldId = current.fieldId ?? current.currentFieldId ?? initialGameState.fieldId;
+      const tile = getTile(fieldId, current.position);
+      const enemy = tile === "boss" ? spawnMiniBoss() : spawnEnemy(fieldId, tile);
       return {
         ...current,
         screen: "battle",
@@ -420,7 +446,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
         <section className="grid gap-4">
           <StatusBar player={player} attack={attack} defense={defense} nextExp={nextLevel?.requiredExp ?? player.exp} location={location} />
           {game.screen === "town" ? (
-            <TownScreen game={game} field={currentField} onNpc={talkToNpc} onRest={restAtInn} onBuy={buyEquipment} onField={() => enterField(game.currentFieldId)} onStatus={openStatus} />
+            <TownScreen game={game} field={currentField} onNpc={talkToNpc} onRest={restAtInn} onBuy={buyEquipment} onField={() => enterField(game.fieldId ?? initialGameState.fieldId)} onStatus={openStatus} />
           ) : null}
           {game.screen === "field" ? (
             <FieldScreen game={game} field={currentField} onMove={move} onTown={() => returnToTown()} onSeek={seekBattle} onStatus={openStatus} />
@@ -428,7 +454,7 @@ export function LearningRpgClient({ dashboard }: LearningRpgClientProps) {
           {game.screen === "battle" ? (
             <BattleScreen enemy={game.currentEnemy} player={player} herbCount={herbCount} onAttack={attackEnemy} onFire={() => castSpell("fire")} onHeal={() => castSpell("heal")} onHerb={useHerb} onFlee={fleeBattle} />
           ) : null}
-          {game.screen === "status" ? <StatusScreen player={player} attack={attack} defense={defense} onBack={() => setGame((current) => ({ ...current, screen: current.previousScreen }))} /> : null}
+          {game.screen === "status" ? <StatusScreen player={player} attack={attack} defense={defense} onBack={closeStatus} /> : null}
         </section>
 
         <aside className="grid gap-4 content-start">

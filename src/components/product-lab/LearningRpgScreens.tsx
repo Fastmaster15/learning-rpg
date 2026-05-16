@@ -1,8 +1,6 @@
 import type { ReactNode } from "react";
 
 import {
-  FIELD_HEIGHT,
-  FIELD_WIDTH,
   type FieldDefinition,
   TREASURE_CHEST_ID,
   equipment,
@@ -14,6 +12,7 @@ import {
   type Player,
   tileClass
 } from "@/lib/learning-rpg-game";
+import { HeroSprite } from "@/components/product-lab/learning-rpg/HeroSprite";
 
 export function StatusBar({ player, attack, defense, nextExp, location }: { player: Player; attack: number; defense: number; nextExp: number; location: string }) {
   return (
@@ -99,36 +98,44 @@ export function FieldScreen({
   return (
     <GamePanel title={field.name} subtitle="探索">
       <div className="grid gap-4 xl:grid-cols-[1fr_240px]">
-        <div className="grid overflow-hidden rounded-[6px] border border-[#394b39]" style={{ gridTemplateColumns: `repeat(${FIELD_WIDTH}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${FIELD_HEIGHT}, minmax(0, 1fr))` }}>
-          {field.map.flatMap((row, y) =>
-            row.map((tile, x) => {
-              const playerHere = game.position.x === x && game.position.y === y;
-              const transition = getFieldTransition(field.fieldId, { x, y });
-              const label =
-                tile === "town"
-                  ? "町"
-                  : tile === "chest"
-                    ? game.openedChestIds.includes(TREASURE_CHEST_ID)
-                      ? "空"
-                      : "宝"
-                    : tile === "boss"
-                      ? game.miniBossDefeated
-                        ? "静"
-                        : "主"
-                      : tile === "goal"
-                        ? "光"
-                        : tile === "gate"
-                          ? transition?.label ?? "門"
-                          : "";
+        <div className="overflow-x-auto rounded-[6px] border border-[#394b39] bg-[#1b2b22]">
+          <div
+            className="grid min-w-max"
+            style={{
+              gridTemplateColumns: `repeat(${field.width}, minmax(2.25rem, 1fr))`,
+              gridTemplateRows: `repeat(${field.height}, minmax(2.25rem, 1fr))`
+            }}
+          >
+            {field.map.flatMap((row, y) =>
+              row.map((tile, x) => {
+                const playerHere = game.position.x === x && game.position.y === y;
+                const transition = getFieldTransition(field.fieldId, { x, y });
+                const label =
+                  tile === "town"
+                    ? "町"
+                    : tile === "chest"
+                      ? game.openedChestIds.includes(TREASURE_CHEST_ID)
+                        ? "空"
+                        : "宝"
+                      : tile === "boss"
+                        ? game.miniBossDefeated
+                          ? "静"
+                          : "主"
+                        : tile === "goal"
+                          ? "光"
+                          : tile === "gate"
+                            ? transition?.label ?? "門"
+                            : "";
 
-              return (
-                <div key={`${x}-${y}`} className={`relative border border-black/20 ${tileClass(tile)}`}>
-                  {playerHere ? <div className="absolute inset-2 grid place-items-center rounded-[4px] border border-[#f3c57a] bg-[#101820] text-sm font-black text-[#f3c57a]">勇</div> : null}
-                  {!playerHere && label ? <span className={`absolute inset-0 grid place-items-center text-[10px] font-black ${tile === "forest" || tile === "boss" || tile === "goal" ? "text-white" : "text-[#16222d]"}`}>{label}</span> : null}
-                </div>
-              );
-            })
-          )}
+                return (
+                  <div key={`${x}-${y}`} className={`relative border border-black/20 ${tileClass(tile)}`}>
+                    {playerHere ? <HeroSprite /> : null}
+                    {!playerHere && label ? <span className={`absolute inset-0 grid place-items-center text-[10px] font-black ${tile === "forest" || tile === "boss" || tile === "goal" ? "text-white" : "text-[#16222d]"}`}>{label}</span> : null}
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
 
         <div className="grid gap-3 content-start">
@@ -136,7 +143,7 @@ export function FieldScreen({
             <p className="text-xs font-bold tracking-[0.18em] text-[#8aa0ad] uppercase">FIELD INFO</p>
             <div className="mt-3 grid gap-2 text-sm">
               <Info label="FIELD ID" value={field.fieldId} dark />
-              <Info label="SIZE" value={`${FIELD_WIDTH} × ${FIELD_HEIGHT}`} dark />
+              <Info label="SIZE" value={`${field.width} × ${field.height}`} dark />
               <Info label="GOAL" value={field.description} dark />
             </div>
           </div>

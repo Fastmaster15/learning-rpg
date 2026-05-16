@@ -4,7 +4,7 @@ export const FIELD_WIDTH = 16;
 export const FIELD_HEIGHT = 12;
 
 export type Screen = "title" | "town" | "field" | "battle" | "status";
-export type FieldId = "meadow_gate" | "whispering_forest" | "ancient_ridge";
+export type FieldId = "town_outskirts" | "grassland_road" | "forest_edge" | "forest_depth";
 export type InventoryItem = { itemId: string; count: number };
 export type Enemy = {
   id: string;
@@ -57,7 +57,9 @@ export type FieldDefinition = {
   name: string;
   townName: string;
   description: string;
-  encounterArea: "grassland" | "forest";
+  width: number;
+  height: number;
+  encounterArea: "safe" | "grassland" | "forest" | "forest_depth";
   entryPosition: Position;
   map: FieldTile[][];
   transitions: Record<string, FieldTransition>;
@@ -66,8 +68,9 @@ export type FieldDefinition = {
 export type GameState = {
   started: boolean;
   screen: Screen;
-  previousScreen: Exclude<Screen, "status">;
-  currentFieldId: FieldId;
+  previousScreen?: Screen | null;
+  fieldId: FieldId;
+  currentFieldId?: FieldId;
   player: Player;
   position: Position;
   currentEnemy: Enemy | null;
@@ -145,9 +148,10 @@ export const enemies: Enemy[] = [
   }
 ];
 
-const MEADOW_GATE_FIELD_ID: FieldId = "meadow_gate";
-const WHISPERING_FOREST_FIELD_ID: FieldId = "whispering_forest";
-const ANCIENT_RIDGE_FIELD_ID: FieldId = "ancient_ridge";
+const TOWN_OUTSKIRTS_FIELD_ID: FieldId = "town_outskirts";
+const GRASSLAND_ROAD_FIELD_ID: FieldId = "grassland_road";
+const FOREST_EDGE_FIELD_ID: FieldId = "forest_edge";
+const FOREST_DEPTH_FIELD_ID: FieldId = "forest_depth";
 
 function buildRow(tile: FieldTile) {
   return Array.from({ length: FIELD_WIDTH }, () => tile);
@@ -166,12 +170,14 @@ function posKey(position: Position) {
 }
 
 export const fields: Record<FieldId, FieldDefinition> = {
-  meadow_gate: {
-    fieldId: MEADOW_GATE_FIELD_ID,
-    name: "草原の門前",
+  town_outskirts: {
+    fieldId: TOWN_OUTSKIRTS_FIELD_ID,
+    name: "町はずれの草原",
     townName: "はじまりの町",
-    description: "町の外に広がる、最初の草原フィールド。北東に進むと森の入口へつながる。",
-    encounterArea: "grassland",
+    description: "町の安心感がまだ残る外縁。水辺と草地の向こうに、少しずつ旅立ちの道が見えてくる。",
+    width: FIELD_WIDTH,
+    height: FIELD_HEIGHT,
+    encounterArea: "safe",
     entryPosition: { x: 3, y: 9 },
     map: createFieldMap("grass", [
       { x: 0, y: 0, tile: "water" },
@@ -253,23 +259,25 @@ export const fields: Record<FieldId, FieldDefinition> = {
     ]),
     transitions: {
       [posKey({ x: 14, y: 2 })]: {
-        toFieldId: WHISPERING_FOREST_FIELD_ID,
+        toFieldId: GRASSLAND_ROAD_FIELD_ID,
         toPosition: { x: 1, y: 5 },
-        label: "森へ"
+        label: "草原道へ"
       },
       [posKey({ x: 2, y: 6 })]: {
-        toFieldId: MEADOW_GATE_FIELD_ID,
+        toFieldId: TOWN_OUTSKIRTS_FIELD_ID,
         toPosition: { x: 3, y: 9 },
-        label: "町へ"
+        label: "町へ戻る"
       }
     }
   },
-  whispering_forest: {
-    fieldId: WHISPERING_FOREST_FIELD_ID,
-    name: "ささやきの森",
+  grassland_road: {
+    fieldId: GRASSLAND_ROAD_FIELD_ID,
+    name: "草原街道",
     townName: "はじまりの町",
-    description: "草原を抜けた先の森。宝箱、強敵、小ボスの手前の緊張感がここで始まる。",
-    encounterArea: "forest",
+    description: "見えているから進みたくなる街道。宝箱や曲がり道があり、先に森の入口が見える。",
+    width: FIELD_WIDTH,
+    height: FIELD_HEIGHT,
+    encounterArea: "grassland",
     entryPosition: { x: 1, y: 5 },
     map: createFieldMap("forest", [
       { x: 0, y: 0, tile: "grass" },
@@ -355,7 +363,7 @@ export const fields: Record<FieldId, FieldDefinition> = {
       { x: 8, y: 6, tile: "grass" },
       { x: 9, y: 6, tile: "forest" },
       { x: 10, y: 6, tile: "forest" },
-      { x: 11, y: 6, tile: "boss" },
+      { x: 11, y: 6, tile: "road" },
       { x: 12, y: 6, tile: "forest" },
       { x: 13, y: 6, tile: "forest" },
       { x: 14, y: 6, tile: "forest" },
@@ -405,23 +413,206 @@ export const fields: Record<FieldId, FieldDefinition> = {
     ]),
     transitions: {
       [posKey({ x: 0, y: 5 })]: {
-        toFieldId: MEADOW_GATE_FIELD_ID,
+        toFieldId: TOWN_OUTSKIRTS_FIELD_ID,
         toPosition: { x: 13, y: 2 },
-        label: "草原へ"
+        label: "町外れへ"
       },
       [posKey({ x: 15, y: 2 })]: {
-        toFieldId: ANCIENT_RIDGE_FIELD_ID,
-        toPosition: { x: 2, y: 10 },
-        label: "古道へ"
+        toFieldId: FOREST_EDGE_FIELD_ID,
+        toPosition: { x: 0, y: 5 },
+        label: "森の入口へ"
       }
     }
   },
-  ancient_ridge: {
-    fieldId: ANCIENT_RIDGE_FIELD_ID,
-    name: "古道の丘",
+  forest_edge: {
+    fieldId: FOREST_EDGE_FIELD_ID,
+    name: "森の入口",
     townName: "はじまりの町",
-    description: "森の先に続く石の古道。小目的地の光が見える、章の締めくくりのフィールド。",
+    description: "木々が濃くなり、少し先は見えるのに気になる。まだ通れない知識の門と、奥へ続く道の予感がある。",
+    width: FIELD_WIDTH,
+    height: FIELD_HEIGHT,
     encounterArea: "forest",
+    entryPosition: { x: 0, y: 5 },
+    map: createFieldMap("hill", [
+      { x: 0, y: 0, tile: "grass" },
+      { x: 1, y: 0, tile: "grass" },
+      { x: 2, y: 0, tile: "road" },
+      { x: 3, y: 0, tile: "road" },
+      { x: 4, y: 0, tile: "road" },
+      { x: 11, y: 0, tile: "gate" },
+      { x: 12, y: 0, tile: "gate" },
+      { x: 13, y: 0, tile: "gate" },
+      { x: 14, y: 0, tile: "grass" },
+      { x: 15, y: 0, tile: "grass" },
+      { x: 1, y: 1, tile: "road" },
+      { x: 2, y: 1, tile: "road" },
+      { x: 3, y: 1, tile: "grass" },
+      { x: 4, y: 1, tile: "grass" },
+      { x: 8, y: 1, tile: "forest" },
+      { x: 9, y: 1, tile: "forest" },
+      { x: 10, y: 1, tile: "forest" },
+      { x: 11, y: 1, tile: "forest" },
+      { x: 12, y: 1, tile: "forest" },
+      { x: 13, y: 1, tile: "grass" },
+      { x: 14, y: 1, tile: "grass" },
+      { x: 15, y: 1, tile: "grass" },
+      { x: 2, y: 2, tile: "road" },
+      { x: 3, y: 2, tile: "road" },
+      { x: 4, y: 2, tile: "grass" },
+      { x: 5, y: 2, tile: "grass" },
+      { x: 7, y: 2, tile: "forest" },
+      { x: 8, y: 2, tile: "forest" },
+      { x: 9, y: 2, tile: "forest" },
+      { x: 10, y: 2, tile: "forest" },
+      { x: 11, y: 2, tile: "forest" },
+      { x: 12, y: 2, tile: "forest" },
+      { x: 13, y: 2, tile: "grass" },
+      { x: 14, y: 2, tile: "grass" },
+      { x: 15, y: 2, tile: "grass" },
+      { x: 1, y: 3, tile: "grass" },
+      { x: 2, y: 3, tile: "grass" },
+      { x: 3, y: 3, tile: "road" },
+      { x: 4, y: 3, tile: "road" },
+      { x: 5, y: 3, tile: "grass" },
+      { x: 6, y: 3, tile: "forest" },
+      { x: 7, y: 3, tile: "forest" },
+      { x: 8, y: 3, tile: "forest" },
+      { x: 12, y: 3, tile: "forest" },
+      { x: 13, y: 3, tile: "forest" },
+      { x: 14, y: 3, tile: "forest" },
+      { x: 15, y: 3, tile: "forest" },
+      { x: 0, y: 4, tile: "grass" },
+      { x: 1, y: 4, tile: "grass" },
+      { x: 2, y: 4, tile: "grass" },
+      { x: 4, y: 4, tile: "grass" },
+      { x: 5, y: 4, tile: "grass" },
+      { x: 6, y: 4, tile: "forest" },
+      { x: 7, y: 4, tile: "forest" },
+      { x: 8, y: 4, tile: "forest" },
+      { x: 9, y: 4, tile: "forest" },
+      { x: 12, y: 4, tile: "forest" },
+      { x: 13, y: 4, tile: "forest" },
+      { x: 14, y: 4, tile: "forest" },
+      { x: 15, y: 4, tile: "forest" },
+      { x: 0, y: 5, tile: "gate" },
+      { x: 1, y: 5, tile: "road" },
+      { x: 2, y: 5, tile: "road" },
+      { x: 3, y: 5, tile: "road" },
+      { x: 4, y: 5, tile: "forest" },
+      { x: 5, y: 5, tile: "forest" },
+      { x: 6, y: 5, tile: "forest" },
+      { x: 7, y: 5, tile: "forest" },
+      { x: 8, y: 5, tile: "forest" },
+      { x: 9, y: 5, tile: "forest" },
+      { x: 10, y: 5, tile: "forest" },
+      { x: 11, y: 5, tile: "forest" },
+      { x: 12, y: 5, tile: "forest" },
+      { x: 13, y: 5, tile: "forest" },
+      { x: 14, y: 5, tile: "forest" },
+      { x: 15, y: 5, tile: "forest" },
+      { x: 2, y: 6, tile: "road" },
+      { x: 3, y: 6, tile: "road" },
+      { x: 4, y: 6, tile: "road" },
+      { x: 5, y: 6, tile: "road" },
+      { x: 6, y: 6, tile: "grass" },
+      { x: 7, y: 6, tile: "grass" },
+      { x: 8, y: 6, tile: "grass" },
+      { x: 9, y: 6, tile: "forest" },
+      { x: 10, y: 6, tile: "forest" },
+      { x: 11, y: 6, tile: "forest" },
+      { x: 12, y: 6, tile: "forest" },
+      { x: 13, y: 6, tile: "forest" },
+      { x: 14, y: 6, tile: "forest" },
+      { x: 15, y: 6, tile: "forest" },
+      { x: 2, y: 7, tile: "grass" },
+      { x: 3, y: 7, tile: "grass" },
+      { x: 4, y: 7, tile: "grass" },
+      { x: 5, y: 7, tile: "road" },
+      { x: 6, y: 7, tile: "road" },
+      { x: 7, y: 7, tile: "road" },
+      { x: 8, y: 7, tile: "grass" },
+      { x: 9, y: 7, tile: "grass" },
+      { x: 10, y: 7, tile: "forest" },
+      { x: 11, y: 7, tile: "forest" },
+      { x: 12, y: 7, tile: "forest" },
+      { x: 13, y: 7, tile: "forest" },
+      { x: 14, y: 7, tile: "forest" },
+      { x: 15, y: 7, tile: "forest" },
+      { x: 4, y: 8, tile: "road" },
+      { x: 5, y: 8, tile: "road" },
+      { x: 6, y: 8, tile: "road" },
+      { x: 7, y: 8, tile: "road" },
+      { x: 8, y: 8, tile: "road" },
+      { x: 9, y: 8, tile: "road" },
+      { x: 10, y: 8, tile: "road" },
+      { x: 11, y: 8, tile: "road" },
+      { x: 12, y: 8, tile: "road" },
+      { x: 13, y: 8, tile: "grass" },
+      { x: 14, y: 8, tile: "grass" },
+      { x: 15, y: 8, tile: "grass" },
+      { x: 3, y: 9, tile: "grass" },
+      { x: 4, y: 9, tile: "grass" },
+      { x: 5, y: 9, tile: "grass" },
+      { x: 6, y: 9, tile: "road" },
+      { x: 7, y: 9, tile: "road" },
+      { x: 8, y: 9, tile: "road" },
+      { x: 9, y: 9, tile: "road" },
+      { x: 10, y: 9, tile: "road" },
+      { x: 11, y: 9, tile: "grass" },
+      { x: 12, y: 9, tile: "grass" },
+      { x: 13, y: 9, tile: "grass" },
+      { x: 14, y: 9, tile: "grass" },
+      { x: 15, y: 9, tile: "grass" },
+      { x: 2, y: 10, tile: "road" },
+      { x: 3, y: 10, tile: "road" },
+      { x: 4, y: 10, tile: "grass" },
+      { x: 5, y: 10, tile: "grass" },
+      { x: 6, y: 10, tile: "grass" },
+      { x: 7, y: 10, tile: "grass" },
+      { x: 8, y: 10, tile: "grass" },
+      { x: 9, y: 10, tile: "grass" },
+      { x: 10, y: 10, tile: "grass" },
+      { x: 11, y: 10, tile: "grass" },
+      { x: 12, y: 10, tile: "grass" },
+      { x: 13, y: 10, tile: "grass" },
+      { x: 14, y: 10, tile: "grass" },
+      { x: 15, y: 10, tile: "grass" },
+      { x: 2, y: 11, tile: "gate" },
+      { x: 3, y: 11, tile: "gate" },
+      { x: 4, y: 11, tile: "gate" },
+      { x: 5, y: 11, tile: "gate" },
+      { x: 6, y: 11, tile: "grass" },
+      { x: 7, y: 11, tile: "grass" },
+      { x: 8, y: 11, tile: "grass" },
+      { x: 9, y: 11, tile: "grass" },
+      { x: 10, y: 11, tile: "grass" },
+      { x: 11, y: 11, tile: "grass" },
+      { x: 12, y: 11, tile: "grass" },
+      { x: 13, y: 11, tile: "grass" },
+      { x: 14, y: 11, tile: "grass" },
+      { x: 15, y: 11, tile: "grass" }
+    ]),
+    transitions: {
+      [posKey({ x: 0, y: 5 })]: {
+        toFieldId: GRASSLAND_ROAD_FIELD_ID,
+        toPosition: { x: 14, y: 2 },
+        label: "街道へ"
+      },
+      [posKey({ x: 11, y: 0 })]: {
+        toFieldId: FOREST_DEPTH_FIELD_ID,
+        toPosition: { x: 2, y: 10 },
+        label: "知識の門"
+      }
+    }
+  },
+  forest_depth: {
+    fieldId: FOREST_DEPTH_FIELD_ID,
+    name: "森の深部",
+    townName: "はじまりの町",
+    description: "最深部の張りつめた空気。学ぶと道が開く、知識の門の先に章の終点がある。",
+    width: FIELD_WIDTH,
+    height: FIELD_HEIGHT,
+    encounterArea: "forest_depth",
     entryPosition: { x: 2, y: 10 },
     map: createFieldMap("hill", [
       { x: 0, y: 0, tile: "grass" },
@@ -429,22 +620,20 @@ export const fields: Record<FieldId, FieldDefinition> = {
       { x: 2, y: 0, tile: "road" },
       { x: 3, y: 0, tile: "road" },
       { x: 4, y: 0, tile: "road" },
-      { x: 8, y: 0, tile: "gate" },
-      { x: 9, y: 0, tile: "gate" },
       { x: 10, y: 0, tile: "gate" },
       { x: 11, y: 0, tile: "gate" },
       { x: 12, y: 0, tile: "gate" },
-      { x: 13, y: 0, tile: "grass" },
+      { x: 13, y: 0, tile: "gate" },
       { x: 14, y: 0, tile: "grass" },
       { x: 15, y: 0, tile: "grass" },
       { x: 1, y: 1, tile: "road" },
       { x: 2, y: 1, tile: "road" },
       { x: 3, y: 1, tile: "road" },
-      { x: 8, y: 1, tile: "road" },
-      { x: 9, y: 1, tile: "road" },
-      { x: 10, y: 1, tile: "road" },
-      { x: 11, y: 1, tile: "road" },
-      { x: 12, y: 1, tile: "road" },
+      { x: 8, y: 1, tile: "forest" },
+      { x: 9, y: 1, tile: "forest" },
+      { x: 10, y: 1, tile: "forest" },
+      { x: 11, y: 1, tile: "forest" },
+      { x: 12, y: 1, tile: "forest" },
       { x: 13, y: 1, tile: "grass" },
       { x: 14, y: 1, tile: "grass" },
       { x: 15, y: 1, tile: "grass" },
@@ -581,21 +770,16 @@ export const fields: Record<FieldId, FieldDefinition> = {
       { x: 15, y: 11, tile: "grass" }
     ]),
     transitions: {
-      [posKey({ x: 8, y: 0 })]: {
-        toFieldId: WHISPERING_FOREST_FIELD_ID,
-        toPosition: { x: 14, y: 2 },
-        label: "森へ"
-      },
       [posKey({ x: 2, y: 11 })]: {
-        toFieldId: WHISPERING_FOREST_FIELD_ID,
-        toPosition: { x: 14, y: 2 },
+        toFieldId: FOREST_EDGE_FIELD_ID,
+        toPosition: { x: 13, y: 0 },
         label: "森へ戻る"
       }
     }
   }
 };
 
-export const fieldOrder: FieldId[] = [MEADOW_GATE_FIELD_ID, WHISPERING_FOREST_FIELD_ID, ANCIENT_RIDGE_FIELD_ID];
+export const fieldOrder: FieldId[] = [TOWN_OUTSKIRTS_FIELD_ID, GRASSLAND_ROAD_FIELD_ID, FOREST_EDGE_FIELD_ID, FOREST_DEPTH_FIELD_ID];
 
 export const initialPlayer: Player = {
   name: "Hero",
@@ -617,9 +801,10 @@ export const initialGameState: GameState = {
   started: false,
   screen: "title",
   previousScreen: "town",
-  currentFieldId: MEADOW_GATE_FIELD_ID,
+  fieldId: TOWN_OUTSKIRTS_FIELD_ID,
+  currentFieldId: TOWN_OUTSKIRTS_FIELD_ID,
   player: initialPlayer,
-  position: fields[MEADOW_GATE_FIELD_ID].entryPosition,
+  position: fields[TOWN_OUTSKIRTS_FIELD_ID].entryPosition,
   currentEnemy: null,
   log: ["旅の準備ができた。"],
   dialogue: "町の人に話しかけて、北の森へ向かう目的を聞こう。",
@@ -677,11 +862,11 @@ export function getNextLevel(level: number) {
 }
 
 export function getField(fieldId: FieldId) {
-  return fields[fieldId] ?? fields[MEADOW_GATE_FIELD_ID];
+  return fields[fieldId] ?? fields[TOWN_OUTSKIRTS_FIELD_ID];
 }
 
 export function getCurrentField(game: GameState) {
-  return getField(game.currentFieldId);
+  return getField(game.fieldId ?? game.currentFieldId ?? TOWN_OUTSKIRTS_FIELD_ID);
 }
 
 export function isInsideMap(fieldId: FieldId, position: Position) {
@@ -697,7 +882,12 @@ export function getFieldTransition(fieldId: FieldId, position: Position) {
   return getField(fieldId).transitions[posKey(position)] ?? null;
 }
 
-export function shouldEncounter(tile: FieldTile, steps: number) {
+export function shouldEncounter(fieldId: FieldId, tile: FieldTile, steps: number) {
+  const field = getField(fieldId);
+  if (field.encounterArea === "safe" || tile === "water" || tile === "town" || tile === "gate" || tile === "chest" || tile === "goal" || tile === "boss") return false;
+  if (field.encounterArea === "grassland") return (tile === "grass" || tile === "road" || tile === "hill") && steps % 4 === 0;
+  if (field.encounterArea === "forest") return (tile === "forest" || tile === "grass") && steps % 2 === 0;
+  if (field.encounterArea === "forest_depth") return (tile === "forest" || tile === "hill" || tile === "grass") && steps % 2 === 0;
   if (tile === "forest") return steps % 2 === 0;
   if (tile === "grass" || tile === "hill" || tile === "road") return steps % 3 === 0;
   return false;
@@ -705,8 +895,13 @@ export function shouldEncounter(tile: FieldTile, steps: number) {
 
 export function spawnEnemy(fieldId: FieldId, tile: FieldTile): Enemy {
   const field = getField(fieldId);
-  const pool = field.encounterArea === "grassland" ? enemies.filter((enemy) => enemy.area === "grassland") : enemies.filter((enemy) => enemy.area === "forest" || enemy.area === "forest_depth");
-  const preferred = tile === "forest" && field.encounterArea === "forest" ? enemies.filter((enemy) => enemy.area === "forest" || enemy.area === "forest_depth") : pool;
+  const pool =
+    field.encounterArea === "grassland"
+      ? enemies.filter((enemy) => enemy.area === "grassland")
+      : field.encounterArea === "forest_depth"
+        ? enemies.filter((enemy) => enemy.area === "forest_depth" || enemy.area === "forest")
+        : enemies.filter((enemy) => enemy.area === "forest" || enemy.area === "forest_depth");
+  const preferred = tile === "forest" && field.encounterArea !== "grassland" ? enemies.filter((enemy) => enemy.area === "forest" || enemy.area === "forest_depth") : pool;
   const base = preferred[Math.floor(Math.random() * preferred.length)] ?? enemies[0];
   return { ...base, hp: base.maxHp };
 }
@@ -760,9 +955,10 @@ export function getLocationLabel(game: GameState) {
     return game.currentEnemy?.role === "mini_boss" ? `${field.name} / 小ボス戦` : game.currentEnemy ? `${field.name} / 戦闘中` : `${field.name} / 確認画面`;
   }
 
-  const tile = getTile(game.currentFieldId, game.position);
+  const fieldId = game.fieldId ?? game.currentFieldId ?? TOWN_OUTSKIRTS_FIELD_ID;
+  const tile = getTile(fieldId, game.position);
   if (tile === "gate") {
-    return getFieldTransition(game.currentFieldId, game.position)?.label ?? field.name;
+    return getFieldTransition(fieldId, game.position)?.label ?? field.name;
   }
 
   const labels: Record<FieldTile, string> = {
