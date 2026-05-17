@@ -32,6 +32,22 @@ npm run dev
 
 - `docs/requirements/classic-jrpg-experience-requirements.md` : クラシックJRPG体験を成立させるための要件。機能一覧ではなく、プレイヤーがどう気持ちよく進むかを中心に整理する。
 
+## 素材管理方針
+
+画像・音声などの大容量素材は GitHub に直接置かず、Vercel Blob / Cloudflare R2 などの外部ストレージ/CDNから読み込む。
+
+- 初期実装は Vercel Blob を優先する
+- Blob容量が厳しくなった場合は Cloudflare R2 へ移行する
+- GitHubには素材本体ではなく、asset manifest、外部URL、ホットスポット座標、イベント定義を置く
+- 外部URLの差し替えを容易にするため、`NEXT_PUBLIC_RPG_ASSET_BASE_URL` を基準URLとして使う
+- 素材ファイルは `asuka-town-v1.webp` のようにバージョン付きで管理し、同一URLの上書きは避ける
+
+初期のマップ素材manifest:
+
+```text
+src/data/assets/maps.ts
+```
+
 ## 個人OS本体との関係
 
 - 個人OS本体は、構想、導線、プロトタイプ一覧、データ連携のハブとして扱う
