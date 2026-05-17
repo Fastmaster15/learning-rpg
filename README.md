@@ -72,6 +72,20 @@ src/data/assets/maps.ts
 - 効果音はブラウザの WebAudio API で短い矩形波を生成しています。
 - 既存RPGの音楽、効果音、メロディ、ジングルは直接使わない方針です。
 
+## 素材管理
+
+画像や音声の素材本体は GitHub に置かず、Vercel Blob へアップロードして配信します。
+
+アップロード手順:
+
+1. Vercel で Blob Store を作成する
+2. `.env.local` に `BLOB_READ_WRITE_TOKEN` を設定する
+3. `.env.local` に `NEXT_PUBLIC_RPG_ASSET_BASE_URL` を設定する
+4. `npm run upload:blob -- <local-file> <blob-path>` を実行する
+5. 発行 URL を確認し、必要に応じて `src/data/assets/maps.ts` の manifest を更新する
+
+`BLOB_READ_WRITE_TOKEN` は `.env.local` のみに置き、GitHub にはコミットしません。ブラウザ側には読み込み用の公開 URL だけを渡します。
+
 ## デザイン方針
 
 - 既存RPGの固有名詞、キャラクター、敵、フォント、ロゴ、画面意匠は直接使わない

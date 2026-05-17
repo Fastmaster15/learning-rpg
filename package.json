@@ -6,12 +6,14 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "lint": "next lint"
+    "lint": "next lint",
+    "upload:blob": "node scripts/upload-blob.mjs"
   },
   "dependencies": {
     "@types/node": "^20.12.12",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "@vercel/blob": "^2.3.3",
     "autoprefixer": "^10.4.19",
     "next": "^14.2.3",
     "postcss": "^8.4.38",
