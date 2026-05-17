@@ -37,6 +37,7 @@ npm run dev
 画像・音声などの大容量素材は GitHub に直接置かず、Vercel Blob / Cloudflare R2 などの外部ストレージ/CDNから読み込む。
 
 - 初期実装は Vercel Blob を優先する
+- Vercel Blob の無料枠は 1GB までとして管理する
 - Blob容量が厳しくなった場合は Cloudflare R2 へ移行する
 - GitHubには素材本体ではなく、asset manifest、外部URL、ホットスポット座標、イベント定義を置く
 - 外部URLの差し替えを容易にするため、`NEXT_PUBLIC_RPG_ASSET_BASE_URL` を基準URLとして使う
